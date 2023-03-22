@@ -16,8 +16,9 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(pico_oled)
 
+add_executable(power_feed main.cc rotary_encoder.cc)
+target_include_directories(power_feed PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 
-add_executable(power_feed main.cc)
 target_link_libraries(power_feed
   pico_stdlib
   pico_bootsel_via_double_reset
