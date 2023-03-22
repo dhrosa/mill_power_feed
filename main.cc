@@ -35,13 +35,15 @@ int main() {
     gpio_pull_up(pin);
   }
   pico_ssd1306::SSD1306 display(i2c0, 0x3C, pico_ssd1306::Size::W128xH32);
-  pico_ssd1306::drawText(&display, font_12x16, "sup world", 0, 0);
-  display.sendBuffer();
 
   bool orientation = false;
   while(true) {
-    sleep_ms(1000);
-    display.invertDisplay();
+    for (const unsigned char* font : {font_5x8, font_8x8, font_12x16, font_16x32}) {
+      display.clear();
+      pico_ssd1306::drawText(&display, font, "sup world", 0, 0);
+      display.sendBuffer();
+      sleep_ms(1000);
+    }
   }
   return 0;
 }
