@@ -7,11 +7,23 @@ include(pico_sdk_import.cmake)
 project(power_feed LANGUAGES C CXX)
 pico_sdk_init()
 
+include(FetchContent)
+FetchContent_Declare(
+  pico_oled
+  GIT_REPOSITORY https://github.com/Harbys/pico-ssd1306.git
+  GIT_TAG master
+)
+
+FetchContent_MakeAvailable(pico_oled)
+
+
 add_executable(power_feed main.cc)
 target_link_libraries(power_feed
   pico_stdlib
   pico_bootsel_via_double_reset
   hardware_pwm
+  pico_ssd1306
+  hardware_i2c
 )
 
 pico_enable_stdio_usb(power_feed 1)
