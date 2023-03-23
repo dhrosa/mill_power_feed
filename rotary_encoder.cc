@@ -8,6 +8,20 @@
 #include <initializer_list>
 
 namespace {
+// RAII wrapper around critical_section_t
+class CriticalSectionLock {
+ public:
+  CriticalSectionLock(critical_section_t& section) : section_(section) {
+    critical_section_enter_blocking(&section_);
+  }
+
+  ~CriticalSectionLock() { critical_section_exit(&section_); }
+
+  CriticalSectionLock(const CriticalSectionLock&) = delete;
+
+ private:
+  critical_section_t& section_;
+};
 
 unsigned clock_pin;
 unsigned direction_pin;
@@ -17,7 +31,7 @@ constexpr std::int64_t kDebouncePeriodUs = 100'000;
 
 std::int64_t last_clock_edge_time_us = 0;
 std::int64_t counter = 0;
-critical_section_t counter_lock;
+critical_section_t counter_critical_section;
 
 void ClockInterrupt() {
   const unsigned events = gpio_get_irq_event_mask(clock_pin);
@@ -31,19 +45,18 @@ void ClockInterrupt() {
   }
   last_clock_edge_time_us = current_time_us;
   const uint direction = gpio_get(direction_pin);
-  critical_section_enter_blocking(&counter_lock);
+  CriticalSectionLock lock(counter_critical_section);
   if (direction) {
     ++counter;
   } else {
     --counter;
   }
-  critical_section_exit(&counter_lock);
 }
 
 }  // namespace
 
 RotaryEncoder::RotaryEncoder(unsigned pin_a, unsigned pin_b) {
-  critical_section_init(&counter_lock);
+  critical_section_init(&counter_critical_section);
   clock_pin = pin_a;
   direction_pin = pin_b;
 
@@ -58,8 +71,6 @@ RotaryEncoder::RotaryEncoder(unsigned pin_a, unsigned pin_b) {
 }
 
 std::int64_t RotaryEncoder::Read() {
-  critical_section_enter_blocking(&counter_lock);
-  const std::int64_t value = counter;
-  critical_section_exit(&counter_lock);
-  return value;
+  CriticalSectionLock lock(counter_critical_section);
+  return counter;
 }
