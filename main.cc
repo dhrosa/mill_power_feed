@@ -44,6 +44,7 @@ int main() {
   pico_ssd1306::SSD1306 display(i2c0, 0x3C, pico_ssd1306::Size::W128xH32);
   display.sendBuffer();
 
+  sleep_ms(2000);
   RotaryEncoder encoder(15, 25);
   while (true) {
     DrawCenteredValue(display, encoder.Read());

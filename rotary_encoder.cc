@@ -4,8 +4,10 @@
 #include <hardware/timer.h>
 #include <pico/sync.h>
 
-#include <atomic>
+#include <array>
+#include <bitset>
 #include <initializer_list>
+#include <iostream>
 
 namespace {
 // RAII wrapper around critical_section_t
@@ -23,51 +25,68 @@ class CriticalSectionLock {
   critical_section_t& section_;
 };
 
-unsigned clock_pin;
-unsigned direction_pin;
+std::array<unsigned, 2> pins;
+std::bitset<2> values = 0b11;
 
-// 100ms debounce time.
-constexpr std::int64_t kDebouncePeriodUs = 100'000;
+int fractional_counter = 0;
 
-std::int64_t last_clock_edge_time_us = 0;
-std::int64_t counter = 0;
 critical_section_t counter_critical_section;
+std::int64_t counter = 0;
 
-void ClockInterrupt() {
-  const unsigned events = gpio_get_irq_event_mask(clock_pin);
-  if (events & GPIO_IRQ_EDGE_FALL == 0) {
-    return;
+constexpr std::array<int, 16> IncrementsTable() {
+  std::array<int, 16> inc = {0};
+
+  inc[0b11'01] = +1;
+  inc[0b11'10] = -1;
+
+  inc[0b01'00] = +1;
+  inc[0b01'11] = -1;
+
+  inc[0b00'10] = +1;
+  inc[0b00'01] = -1;
+
+  inc[0b10'11] = +1;
+  inc[0b10'00] = -1;
+  return inc;
+}
+
+constexpr auto kIncrementsTable = IncrementsTable();
+
+void EdgeInterrupt() {
+  const std::bitset<2> previous_values = values;
+  for (int i : {0, 1}) {
+    const unsigned events = gpio_get_irq_event_mask(pins[i]);
+    if (events & GPIO_IRQ_EDGE_RISE) {
+      values[i] = true;
+    } else if (events & GPIO_IRQ_EDGE_FALL) {
+      values[i] = false;
+    }
+    gpio_acknowledge_irq(pins[i], GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL);
   }
-  gpio_acknowledge_irq(clock_pin, GPIO_IRQ_EDGE_FALL);
-  const std::int64_t current_time_us = time_us_64();
-  if (current_time_us - last_clock_edge_time_us < kDebouncePeriodUs) {
-    return;
-  }
-  last_clock_edge_time_us = current_time_us;
-  const uint direction = gpio_get(direction_pin);
-  CriticalSectionLock lock(counter_critical_section);
-  if (direction) {
-    ++counter;
-  } else {
-    --counter;
+  const unsigned transition =
+      (previous_values.to_ulong() << 2) | values.to_ulong();
+  fractional_counter += kIncrementsTable[transition];
+  const int divisor = 4;
+  if (fractional_counter == -divisor || fractional_counter == +divisor) {
+    CriticalSectionLock lock(counter_critical_section);
+    counter += fractional_counter / divisor;
+    fractional_counter = 0;
   }
 }
 
 }  // namespace
 
 RotaryEncoder::RotaryEncoder(unsigned pin_a, unsigned pin_b) {
+  pins = {pin_a, pin_b};
   critical_section_init(&counter_critical_section);
-  clock_pin = pin_a;
-  direction_pin = pin_b;
-
-  for (unsigned pin : {clock_pin, direction_pin}) {
-    gpio_init(pin);
-    gpio_pull_up(pin);
-  }
 
   irq_set_enabled(IO_IRQ_BANK0, true);
-  gpio_add_raw_irq_handler(clock_pin, ClockInterrupt);
-  gpio_set_irq_enabled(clock_pin, GPIO_IRQ_EDGE_FALL, true);
+  for (unsigned pin : pins) {
+    gpio_init(pin);
+    gpio_pull_up(pin);
+    gpio_add_raw_irq_handler(pin, EdgeInterrupt);
+    gpio_set_irq_enabled(pin, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
+  }
 }
 
 std::int64_t RotaryEncoder::Read() {
