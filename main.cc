@@ -45,7 +45,7 @@ int main() {
   display.sendBuffer();
 
   sleep_ms(2000);
-  RotaryEncoder encoder(15, 25);
+  RotaryEncoder<15, 25> encoder;
   while (true) {
     DrawCenteredValue(display, encoder.Read());
     sleep_ms(100);
