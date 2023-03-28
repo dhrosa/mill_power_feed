@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <iostream>
 #include <string>
+#include <tuple>
 
 #include "rotary_encoder.h"
 #include "ssd1306.h"
@@ -57,12 +58,13 @@ int main() {
     const std::int64_t values[3] = {encoder_a.Read(), encoder_b.Read(),
                                     encoder_c.Read()};
     for (int i = 0; i < 3; ++i) {
-      const auto text = std::to_string(values[i]);
+      std::array<char, 16 + 1> buffer;
+      std::snprintf(buffer.data(), buffer.size(), "%+4lld", values[i]);
       auto [x, y] = positions[i];
-      pico_ssd1306::drawText(&display, font, text.c_str(), x, y);
+      pico_ssd1306::drawText(&display, font, buffer.data(), x, y);
     }
     display.sendBuffer();
-    sleep_ms(100);
+    sleep_ms(25);
   }
   return 0;
 }
