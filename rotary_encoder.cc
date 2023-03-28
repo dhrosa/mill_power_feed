@@ -42,7 +42,6 @@ void RotaryEncoder::State::Init(irq_handler_t edge_interrupt_handler) {
     gpio_add_raw_irq_handler(pin, edge_interrupt_handler);
     gpio_set_irq_enabled(pin, kPinEventMask, true);
   }
-  irq_set_enabled(IO_IRQ_BANK0, true);
 }
 
 void RotaryEncoder::State::EdgeInterrupt() {
