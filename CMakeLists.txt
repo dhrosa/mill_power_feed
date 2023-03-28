@@ -18,13 +18,14 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(pico_oled)
 
-add_executable(power_feed main.cc rotary_encoder.cc)
+add_executable(power_feed main.cc rotary_encoder.cc digital_input.cc)
 # We run over the default setting of 4.
 target_compile_definitions(power_feed PRIVATE PICO_MAX_SHARED_IRQ_HANDLERS=16)
 target_include_directories(power_feed PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 
 target_link_libraries(power_feed
   pico_stdlib
+  pico_async_context_poll
   pico_bootsel_via_double_reset
   hardware_pwm
   pico_ssd1306
