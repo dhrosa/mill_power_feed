@@ -3,6 +3,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(PICO_BOARD arduino_nano_rp2040_connect)
 set(PICO_SDK_FETCH_FROM_GIT on)
+
 include(pico_sdk_import.cmake)
 
 project(power_feed LANGUAGES C CXX)
@@ -18,6 +19,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(pico_oled)
 
 add_executable(power_feed main.cc rotary_encoder.cc)
+# We run over the default setting of 4.
+target_compile_definitions(power_feed PRIVATE PICO_MAX_SHARED_IRQ_HANDLERS=16)
 target_include_directories(power_feed PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 
 target_link_libraries(power_feed
