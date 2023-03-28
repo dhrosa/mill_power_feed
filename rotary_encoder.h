@@ -14,12 +14,15 @@
 // would be run-time sharing and multiplexing of a single global interrupt
 // handler.
 //
+// Trivially copyable and moveable. Copied/moved values will refer to the same
+// internal state.
+//
 // This technique template is inspired by
 // https://github.com/tobiglaser/RP2040-Encoder/
-struct RotaryEncoderState;
-
 class RotaryEncoder {
  public:
+  // Must only be called once per pin pair. Creates the encoder instance and
+  // sets up interrupt handlers for it.
   template <unsigned pin_a, unsigned pin_b>
   static RotaryEncoder Create();
 
@@ -27,13 +30,17 @@ class RotaryEncoder {
   std::int64_t Read();
 
  private:
-  RotaryEncoderState* state_;
+  struct State;
+  State* state_;
+
+  template <std::array<unsigned, 2> pins>
+  struct Singleton;
 };
 
 // Internal implementation details below.
 
 // Global state per encoder.
-struct RotaryEncoderState {
+struct RotaryEncoder::State {
   // The GPIO pin numbers for the encoder.
   const std::array<unsigned, 2> pins;
   // The current encoder pins values. This assumes encoder switches shorting the
@@ -60,28 +67,17 @@ struct RotaryEncoderState {
 
 // Per-pin-pair singleton.
 template <std::array<unsigned, 2> pins>
-class RotaryEncoderSingleton {
- private:
-  friend class RotaryEncoder;
-
-  static void EdgeInterrupt();
-  static RotaryEncoderState state_;
+struct RotaryEncoder::Singleton {
+  inline static RotaryEncoder::State state{.pins = pins};
+  static void EdgeInterrupt() { state.EdgeInterrupt(); }
 };
-
-template <std::array<unsigned, 2> pins>
-RotaryEncoderState RotaryEncoderSingleton<pins>::state_{.pins = pins};
-
-template <std::array<unsigned, 2> pins>
-void RotaryEncoderSingleton<pins>::EdgeInterrupt() {
-  state_.EdgeInterrupt();
-}
 
 template <unsigned pin_a, unsigned pin_b>
 RotaryEncoder RotaryEncoder::Create() {
   constexpr std::array<unsigned, 2> pins = {pin_a, pin_b};
-  using Singleton = RotaryEncoderSingleton<pins>;
-  RotaryEncoderState& state = Singleton::state_;
-  state.Init(&Singleton::EdgeInterrupt);
+  RotaryEncoder::State& state = Singleton<pins>::state;
+  state.Init(&Singleton<pins>::EdgeInterrupt);
+
   RotaryEncoder encoder;
   encoder.state_ = &state;
   return encoder;
