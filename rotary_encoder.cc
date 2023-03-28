@@ -1,21 +1,8 @@
 #include "rotary_encoder.h"
 
+#include "picopp/critical_section.h"
+
 namespace {
-// RAII wrapper around critical_section_t
-class CriticalSectionLock {
- public:
-  CriticalSectionLock(critical_section_t& section) : section_(section) {
-    critical_section_enter_blocking(&section_);
-  }
-
-  ~CriticalSectionLock() { critical_section_exit(&section_); }
-
-  CriticalSectionLock(const CriticalSectionLock&) = delete;
-
- private:
-  critical_section_t& section_;
-};
-
 // Mapping of `abAB` values to fractional counter increments, where `ab` are the
 // bits representing the previous readings of the encoder pins, and `AB` are the
 // bits representing the new readings.
