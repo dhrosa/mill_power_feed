@@ -8,8 +8,6 @@
 #include <cstdint>
 #include <initializer_list>
 
-struct RotaryEncoderState;
-
 // Interrupt-based incremental rotary encoder reader. Accepting the pin numbers
 // as template arguments rather than runtime parameters allows us to instantiate
 // a different global interrupt handler function per encoder. The alternative
@@ -18,21 +16,18 @@ struct RotaryEncoderState;
 //
 // This technique template is inspired by
 // https://github.com/tobiglaser/RP2040-Encoder/
-template <unsigned pin_a, unsigned pin_b>
+struct RotaryEncoderState;
+
 class RotaryEncoder {
  public:
-  // Only one encoder instnace may be created per pin pair.
-  RotaryEncoder();
+  template <unsigned pin_a, unsigned pin_b>
+  static RotaryEncoder Create();
 
-  // Read the current signed cumulative dedent count.
+  // The current signed cumulative dedent count.
   std::int64_t Read();
 
  private:
-  // Global interrupt handler for this pin pair.
-  static void EdgeInterrupt();
-
-  // Global state for this pin pair.
-  static RotaryEncoderState state_;
+  RotaryEncoderState* state_;
 };
 
 // Internal implementation details below.
@@ -63,20 +58,31 @@ struct RotaryEncoderState {
   std::int64_t Read();
 };
 
-template <unsigned pin_a, unsigned pin_b>
-RotaryEncoderState RotaryEncoder<pin_a, pin_b>::state_{.pins = {pin_a, pin_b}};
+// Per-pin-pair singleton.
+template <std::array<unsigned, 2> pins>
+class RotaryEncoderSingleton {
+ private:
+  friend class RotaryEncoder;
 
-template <unsigned pin_a, unsigned pin_b>
-RotaryEncoder<pin_a, pin_b>::RotaryEncoder() {
-  state_.Init(&RotaryEncoder<pin_a, pin_b>::EdgeInterrupt);
-}
+  static void EdgeInterrupt();
+  static RotaryEncoderState state_;
+};
 
-template <unsigned pin_a, unsigned pin_b>
-std::int64_t RotaryEncoder<pin_a, pin_b>::Read() {
-  return state_.Read();
-}
+template <std::array<unsigned, 2> pins>
+RotaryEncoderState RotaryEncoderSingleton<pins>::state_{.pins = pins};
 
-template <unsigned pin_a, unsigned pin_b>
-void RotaryEncoder<pin_a, pin_b>::EdgeInterrupt() {
+template <std::array<unsigned, 2> pins>
+void RotaryEncoderSingleton<pins>::EdgeInterrupt() {
   state_.EdgeInterrupt();
+}
+
+template <unsigned pin_a, unsigned pin_b>
+RotaryEncoder RotaryEncoder::Create() {
+  constexpr std::array<unsigned, 2> pins = {pin_a, pin_b};
+  using Singleton = RotaryEncoderSingleton<pins>;
+  RotaryEncoderState& state = Singleton::state_;
+  state.Init(&Singleton::EdgeInterrupt);
+  RotaryEncoder encoder;
+  encoder.state_ = &state;
+  return encoder;
 }

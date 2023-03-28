@@ -45,6 +45,8 @@ constexpr std::uint32_t kPinEventMask = GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL;
 
 }  // namespace
 
+std::int64_t RotaryEncoder::Read() { return state_->Read(); }
+
 void RotaryEncoderState::Init(irq_handler_t edge_interrupt_handler) {
   critical_section_init(&counter_critical_section);
   for (unsigned pin : pins) {
