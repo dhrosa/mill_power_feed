@@ -15,9 +15,9 @@ void DigitalInput::State::FallInterrupt() {
     return;
   }
   gpio_acknowledge_irq(pin, events);
-  // Debounce fall events within 10ms of eachother.
+  // Debounce fall events within 100ms of eachother.
   const std::uint64_t time_us = time_us_64();
-  if (time_us - last_event_time_us < 10'000) {
+  if (time_us - last_event_time_us < 100'000) {
     return;
   }
   last_event_time_us = time_us;

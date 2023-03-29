@@ -98,3 +98,98 @@ inline AsyncWorker::~AsyncWorker() {
 inline void AsyncWorker::SetWorkPending() {
   async_context_set_work_pending(state_->context, &state_->worker);
 }
+
+// RAII wrapper around async_at_time_worker_t.
+class AsyncScheduledWorker {
+ public:
+  // Creates an async worker that calls `do_work` each time it's awoken. `Tag`
+  // must be a type unique to each Create() call, but other than that the
+  // properties of the `Tag` type are irrelevant.
+  //
+  // The functor should return an absolute_time_t indicating when it should next
+  // be automatically scheduled. nil_time may be returned to indicate that we
+  // should not automatically reschedule.
+  template <typename Tag, typename F>
+  static AsyncScheduledWorker Create(async_context_t& context, F&& do_work);
+
+  // Convenience overload for the above when the functor type can also act as
+  // the unique tag type. For example, lambdas have unique types.
+  template <typename F>
+  static AsyncScheduledWorker Create(async_context_t& context, F&& do_work) {
+    return Create<F, F>(context, std::move(do_work));
+  }
+
+  // Empty state. The only valid operations on an empty worker are destruction
+  // and moving.
+  AsyncScheduledWorker() = default;
+
+  // Remove the worker from its async context if non-empty.
+  ~AsyncScheduledWorker();
+
+  AsyncScheduledWorker(AsyncScheduledWorker&& other) {
+    *this = std::move(other);
+  }
+
+  AsyncScheduledWorker& operator=(AsyncScheduledWorker&& other) {
+    if (&other != this) {
+      state_ = std::exchange(other.state_, nullptr);
+    }
+    return *this;
+  }
+
+  // Schedule the worker to execute at the given time. No-op if the worker is
+  // already scheduled.
+  void ScheduleAt(absolute_time_t time);
+
+ private:
+  struct State;
+
+  template <typename Tag, typename F>
+  struct Singleton;
+
+  State* state_;
+};
+
+struct AsyncScheduledWorker::State {
+  async_context_t* context;
+  async_at_time_worker_t worker;
+
+  void ScheduleAt(absolute_time_t time) {
+    async_context_add_at_time_worker_at(context, &worker, time);
+  }
+};
+
+template <typename Tag, typename F>
+struct AsyncScheduledWorker::Singleton {
+  inline static State state = {};
+
+  // Using optional to avoid needing a default-constructible functor; this
+  // member is never read in its null state.
+  inline static std::optional<F> do_work = std::nullopt;
+
+  static void DoWork(async_context_t* context, async_at_time_worker_t* worker) {
+    const absolute_time_t next_time = (*do_work)();
+    if (is_nil_time(next_time)) {
+      return;
+    }
+    state.ScheduleAt(next_time);
+  }
+};
+
+template <typename Tag, typename F>
+AsyncScheduledWorker AsyncScheduledWorker::Create(async_context_t& context,
+                                                  F&& do_work) {
+  using SingletonType = Singleton<Tag, F>;
+  SingletonType::do_work = std::forward<F>(do_work);
+  State& state = SingletonType::state;
+  state.context = &context;
+  state.worker.do_work = &SingletonType::DoWork;
+
+  AsyncScheduledWorker worker;
+  worker.state_ = &state;
+  return worker;
+}
+
+inline void AsyncScheduledWorker::ScheduleAt(absolute_time_t time) {
+  state_->ScheduleAt(time);
+}

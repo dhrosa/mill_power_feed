@@ -2,7 +2,6 @@
 #include <hardware/i2c.h>
 #include <hardware/pwm.h>
 #include <hardware/timer.h>
-#include <pico/async_context.h>
 #include <pico/async_context_poll.h>
 #include <pico/stdlib.h>
 
@@ -47,13 +46,10 @@ void AsyncShenanigans() {
     std::cout << "button press @" << time_ms() << std::endl;
   });
 
-  async_at_time_worker_t worker;
-  worker.do_work = +[](async_context_t* context,
-                       async_at_time_worker_t* worker) {
+  auto worker = AsyncScheduledWorker::Create(*context, []() -> absolute_time_t {
     std::cout << "scheduled async worker triggered @" << time_ms() << std::endl;
-    async_context_add_at_time_worker_in_ms(context, worker, 1000);
-  };
-  worker.do_work(context, &worker);
+    return make_timeout_time_ms(1000);
+  });
 
   while (true) {
     async_context_wait_for_work_until(context, at_the_end_of_time);
