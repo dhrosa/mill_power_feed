@@ -2,20 +2,20 @@
 
 #include <hardware/gpio.h>
 #include <pico/async_context.h>
-#include <pico/sync.h>
 
+#include <cstdint>
 #include <functional>
 
 // Interrupt-based GPIO input handler.
 class DigitalInput {
  public:
-  using ValueCallback = std::function<void(bool value)>;
+  using OnPress = std::function<void()>;
+
   template <unsigned pin>
-  static DigitalInput Create(async_context& context, ValueCallback callback);
+  static void SetPressHandler(async_context& context, OnPress on_press);
 
  private:
   struct State;
-  State* state_;
 
   template <unsigned pin>
   struct Singleton;
@@ -25,38 +25,31 @@ class DigitalInput {
 
 struct DigitalInput::State {
   unsigned pin;
-  critical_section_t value_critical_section;
-  bool value = false;
-
-  ValueCallback callback;
+  OnPress on_press;
   async_context_t* async_context;
   async_when_pending_worker_t async_worker{.work_pending = false};
 
+  std::uint64_t last_event_time_us = 0;
+
   void Init(irq_handler_t edge_interrupt_handler);
-  void EdgeInterrupt();
-  bool Value();
+  void FallInterrupt();
 };
 
 template <unsigned pin>
 struct DigitalInput::Singleton {
   inline static State state{.pin = pin};
-  static void EdgeInterrupt() { state.EdgeInterrupt(); }
-  static void OnAsyncEvent(async_context_t* context,
-                           async_when_pending_worker_t* async_worker) {
-    state.callback(state.Value());
+  static void FallInterrupt() { state.FallInterrupt(); }
+  static void CallPressHandler(async_context_t* context,
+                               async_when_pending_worker_t* async_worker) {
+    state.on_press();
   }
 };
 
 template <unsigned pin>
-DigitalInput DigitalInput::Create(async_context_t& context,
-                                  ValueCallback callback) {
+void DigitalInput::SetPressHandler(async_context_t& context, OnPress on_press) {
   State& state = Singleton<pin>::state;
-  state.callback = callback;
+  state.on_press = on_press;
   state.async_context = &context;
-  state.async_worker.do_work = &Singleton<pin>::OnAsyncEvent;
-  state.Init(&Singleton<pin>::EdgeInterrupt);
-
-  DigitalInput input;
-  input.state_ = &state;
-  return input;
+  state.async_worker.do_work = &Singleton<pin>::CallPressHandler;
+  state.Init(&Singleton<pin>::FallInterrupt);
 }

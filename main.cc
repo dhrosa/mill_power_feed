@@ -42,9 +42,8 @@ void AsyncShenanigans() {
 
   async_context_t* context = &poll_context.core;
 
-  DigitalInput::Create<15>(*context, [](bool value) {
-    std::cout << "new digital input: " << int(value) << "@" << time_ms()
-              << std::endl;
+  DigitalInput::SetPressHandler<15>(*context, []() {
+    std::cout << "button press @" << time_ms() << std::endl;
   });
 
   async_at_time_worker_t worker;
