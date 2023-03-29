@@ -13,6 +13,7 @@
 #include <tuple>
 
 #include "digital_input.h"
+#include "picopp/async.h"
 #include "rotary_encoder.h"
 #include "ssd1306.h"
 #include "textRenderer/TextRenderer.h"
