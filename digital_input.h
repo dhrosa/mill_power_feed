@@ -1,10 +1,10 @@
 #pragma once
 
-#include <hardware/gpio.h>
-
 #include <cstdint>
+#include <type_traits>
 
 #include "picopp/async.h"
+#include "picopp/irq.h"
 
 // Interrupt-based GPIO input handler.
 class DigitalInput {
@@ -16,9 +16,6 @@ class DigitalInput {
 
  private:
   struct State;
-
-  template <unsigned pin>
-  struct Singleton;
 };
 
 // Internal implementation details below.
@@ -29,21 +26,16 @@ struct DigitalInput::State {
   std::int64_t last_event_time_us = 0;
 
   void Init(irq_handler_t edge_interrupt_handler);
-  void FallInterrupt();
-};
-
-template <unsigned pin>
-struct DigitalInput::Singleton {
-  inline static State state{.pin = pin};
-
-  static void FallInterrupt() { state.FallInterrupt(); }
+  void HandleInterrupt();
 };
 
 template <unsigned pin, typename F>
 void DigitalInput::SetPressHandler(async_context_t& context, F&& on_press) {
-  using SingletonType = Singleton<pin>;
-  State& state = SingletonType::state;
+  using Tag = std::integral_constant<unsigned, pin>;
+  using Singleton = InterruptHandlerSingleton<Tag, State>;
+  State& state = Singleton::state;
+  state.pin = pin;
   state.async_worker =
-      AsyncWorker::Create<SingletonType>(context, std::forward<F>(on_press));
-  state.Init(&Singleton<pin>::FallInterrupt);
+      AsyncWorker::Create<Singleton>(context, std::forward<F>(on_press));
+  state.Init(Singleton::interrupt_handler);
 }

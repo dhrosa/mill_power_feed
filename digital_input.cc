@@ -1,6 +1,7 @@
 #include "digital_input.h"
 
 #include <hardware/timer.h>
+#include <hardware/gpio.h>
 
 void DigitalInput::State::Init(irq_handler_t edge_interrupt_handler) {
   gpio_init(pin);
@@ -9,7 +10,7 @@ void DigitalInput::State::Init(irq_handler_t edge_interrupt_handler) {
   gpio_set_irq_enabled(pin, GPIO_IRQ_EDGE_FALL, true);
 }
 
-void DigitalInput::State::FallInterrupt() {
+void DigitalInput::State::HandleInterrupt() {
   const std::uint32_t events = gpio_get_irq_event_mask(pin);
   if ((events & GPIO_IRQ_EDGE_FALL) == 0) {
     return;
