@@ -7,6 +7,9 @@
 #include <bitset>
 #include <cstdint>
 #include <initializer_list>
+#include <utility>
+
+#include "picopp/irq.h"
 
 // Interrupt-based incremental rotary encoder reader. Accepting the pin numbers
 // as template arguments rather than runtime parameters allows us to instantiate
@@ -32,9 +35,6 @@ class RotaryEncoder {
  private:
   struct State;
   State* state_;
-
-  template <std::array<unsigned, 2> pins>
-  struct Singleton;
 };
 
 // Internal implementation details below.
@@ -42,7 +42,7 @@ class RotaryEncoder {
 // Global state per encoder.
 struct RotaryEncoder::State {
   // The GPIO pin numbers for the encoder.
-  const std::array<unsigned, 2> pins;
+  std::array<unsigned, 2> pins;
   // The current encoder pins values. This assumes encoder switches shorting the
   // pins to ground on contact; i.e. 1 is disconnected, 0 is connected.
   std::bitset<2> values = 0b11;
@@ -59,24 +59,21 @@ struct RotaryEncoder::State {
   void Init(irq_handler_t edge_interrupt_handler);
 
   // Handle an edge transition on either signal.
-  void EdgeInterrupt();
+  void HandleInterrupt();
 
   // The current signed cumulative dedent count.
   std::int64_t Read();
 };
 
-// Per-pin-pair singleton.
-template <std::array<unsigned, 2> pins>
-struct RotaryEncoder::Singleton {
-  inline static RotaryEncoder::State state{.pins = pins};
-  static void EdgeInterrupt() { state.EdgeInterrupt(); }
-};
-
 template <unsigned pin_a, unsigned pin_b>
 RotaryEncoder RotaryEncoder::Create() {
-  constexpr std::array<unsigned, 2> pins = {pin_a, pin_b};
-  RotaryEncoder::State& state = Singleton<pins>::state;
-  state.Init(&Singleton<pins>::EdgeInterrupt);
+  // Unique tag type for each pin pair.
+  using Tag = std::integer_sequence<unsigned, pin_a, pin_b>;
+  using Singleton = InterruptHandlerSingleton<Tag, State>;
+  
+  State& state = Singleton::state;
+  state.pins = {pin_a, pin_b};
+  state.Init(Singleton::interrupt_handler);
 
   RotaryEncoder encoder;
   encoder.state_ = &state;

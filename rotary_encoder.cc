@@ -44,7 +44,7 @@ void RotaryEncoder::State::Init(irq_handler_t edge_interrupt_handler) {
   }
 }
 
-void RotaryEncoder::State::EdgeInterrupt() {
+void RotaryEncoder::State::HandleInterrupt() {
   const std::bitset<2> previous_values = values;
   const std::bitset<32> all_gpio_values = gpio_get_all();
   for (int i : {0, 1}) {
