@@ -1,20 +1,18 @@
 #pragma once
 
 #include <hardware/gpio.h>
-#include <pico/async_context.h>
 
 #include <cstdint>
-#include <functional>
+
+#include "picopp/async.h"
 
 // Interrupt-based GPIO input handler.
 class DigitalInput {
  public:
-  using OnPress = std::function<void()>;
-
   // Each time `pin` transitions from 1->0, `on_press` will be called within the
   // given async context.
-  template <unsigned pin>
-  static void SetPressHandler(async_context& context, OnPress on_press);
+  template <unsigned pin, typename F>
+  static void SetPressHandler(async_context& context, F&& on_press);
 
  private:
   struct State;
@@ -27,10 +25,7 @@ class DigitalInput {
 
 struct DigitalInput::State {
   unsigned pin;
-  OnPress on_press;
-  async_context_t* async_context;
-  async_when_pending_worker_t async_worker{.work_pending = false};
-
+  AsyncWorker async_worker;
   std::int64_t last_event_time_us = 0;
 
   void Init(irq_handler_t edge_interrupt_handler);
@@ -40,18 +35,15 @@ struct DigitalInput::State {
 template <unsigned pin>
 struct DigitalInput::Singleton {
   inline static State state{.pin = pin};
+
   static void FallInterrupt() { state.FallInterrupt(); }
-  static void CallPressHandler(async_context_t* context,
-                               async_when_pending_worker_t* async_worker) {
-    state.on_press();
-  }
 };
 
-template <unsigned pin>
-void DigitalInput::SetPressHandler(async_context_t& context, OnPress on_press) {
-  State& state = Singleton<pin>::state;
-  state.on_press = on_press;
-  state.async_context = &context;
-  state.async_worker.do_work = &Singleton<pin>::CallPressHandler;
+template <unsigned pin, typename F>
+void DigitalInput::SetPressHandler(async_context_t& context, F&& on_press) {
+  using SingletonType = Singleton<pin>;
+  State& state = SingletonType::state;
+  state.async_worker =
+      AsyncWorker::Create<SingletonType>(context, std::forward<F>(on_press));
   state.Init(&Singleton<pin>::FallInterrupt);
 }

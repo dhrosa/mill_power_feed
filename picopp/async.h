@@ -5,6 +5,7 @@
 #include <concepts>
 #include <functional>
 #include <optional>
+#include <utility>
 
 template <typename F>
 concept IsAsyncWorkerFunctor = std::invocable<F>;
@@ -26,8 +27,20 @@ class AsyncWorker {
     return Create<F, F>(context, std::forward<F>(do_work));
   }
 
-  // Remove the worker from its async context.
+  // Empty state. The only valid operations on an empty worker are destruction
+  // and moving.
+  AsyncWorker() = default;
+
+  // Remove the worker from its async context if non-empty.
   ~AsyncWorker();
+
+  AsyncWorker(AsyncWorker&& other) { *this = std::move(other); }
+  AsyncWorker& operator=(AsyncWorker&& other) {
+    if (&other != this) {
+      state_ = std::exchange(other.state_, nullptr);
+    }
+    return *this;
+  }
 
   // Mark the worke as having work pending, which will cause the worker to be
   // run from the async context at some later time.
@@ -39,8 +52,8 @@ class AsyncWorker {
   template <typename Tag, typename F>
   struct Singleton;
 
-  AsyncWorker(State& state) : state_(state) {}
-  State& state_;
+  AsyncWorker(State& state) : state_(&state) {}
+  State* state_ = nullptr;
 };
 
 struct AsyncWorker::State {
@@ -72,13 +85,16 @@ AsyncWorker AsyncWorker::Create(async_context_t& context, F&& do_work) {
   state.context = &context;
   state.worker.do_work = &SingletonType::DoWork;
   async_context_add_when_pending_worker(state.context, &state.worker);
-  return AsyncWorker{state};
+  return AsyncWorker(state);
 }
 
-AsyncWorker::~AsyncWorker() {
-  async_context_remove_when_pending_worker(state_.context, &state_.worker);
+inline AsyncWorker::~AsyncWorker() {
+  if (state_ == nullptr) {
+    return;
+  }
+  async_context_remove_when_pending_worker(state_->context, &state_->worker);
 }
 
-void AsyncWorker::SetWorkPending() {
-  async_context_set_work_pending(state_.context, &state_.worker);
+inline void AsyncWorker::SetWorkPending() {
+  async_context_set_work_pending(state_->context, &state_->worker);
 }

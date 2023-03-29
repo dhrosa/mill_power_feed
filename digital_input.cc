@@ -3,7 +3,6 @@
 #include <hardware/timer.h>
 
 void DigitalInput::State::Init(irq_handler_t edge_interrupt_handler) {
-  async_context_add_when_pending_worker(async_context, &async_worker);
   gpio_init(pin);
   gpio_pull_up(pin);
   gpio_add_raw_irq_handler(pin, edge_interrupt_handler);
@@ -22,6 +21,5 @@ void DigitalInput::State::FallInterrupt() {
     return;
   }
   last_event_time_us = time_us;
-  // Wake the async worker.
-  async_context_set_work_pending(async_context, &async_worker);
+  async_worker.SetWorkPending();
 }
