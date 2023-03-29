@@ -1,6 +1,6 @@
 #include "digital_input.h"
 
-#include <cstdint>
+#include <hardware/timer.h>
 
 void DigitalInput::State::Init(irq_handler_t edge_interrupt_handler) {
   async_context_add_when_pending_worker(async_context, &async_worker);
@@ -16,5 +16,12 @@ void DigitalInput::State::FallInterrupt() {
     return;
   }
   gpio_acknowledge_irq(pin, events);
+  // Debounce fall events within 10ms of eachother.
+  const std::uint64_t time_us = time_us_64();
+  if (time_us - last_event_time_us < 10'000) {
+    return;
+  }
+  last_event_time_us = time_us;
+  // Wake the async worker.
   async_context_set_work_pending(async_context, &async_worker);
 }

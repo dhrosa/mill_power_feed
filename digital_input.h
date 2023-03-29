@@ -11,6 +11,8 @@ class DigitalInput {
  public:
   using OnPress = std::function<void()>;
 
+  // Each time `pin` transitions from 1->0, `on_press` will be called within the
+  // given async context.
   template <unsigned pin>
   static void SetPressHandler(async_context& context, OnPress on_press);
 
@@ -29,7 +31,7 @@ struct DigitalInput::State {
   async_context_t* async_context;
   async_when_pending_worker_t async_worker{.work_pending = false};
 
-  std::uint64_t last_event_time_us = 0;
+  std::int64_t last_event_time_us = 0;
 
   void Init(irq_handler_t edge_interrupt_handler);
   void FallInterrupt();
