@@ -80,7 +80,7 @@ struct AsyncWorker::Singleton {
 template <typename Tag, IsAsyncWorkerFunctor F>
 AsyncWorker AsyncWorker::Create(async_context_t& context, F&& do_work) {
   using SingletonType = Singleton<Tag, F>;
-  SingletonType::do_work.emplace(std::forward<F>(do_work));
+  SingletonType::do_work.emplace(do_work);
   State& state = SingletonType::state;
   state.context = &context;
   state.worker.do_work = &SingletonType::DoWork;
@@ -116,7 +116,7 @@ class AsyncScheduledWorker {
   // the unique tag type. For example, lambdas have unique types.
   template <typename F>
   static AsyncScheduledWorker Create(async_context_t& context, F&& do_work) {
-    return Create<F, F>(context, std::move(do_work));
+    return Create<F, F>(context, std::forward<F>(do_work));
   }
 
   // Empty state. The only valid operations on an empty worker are destruction
@@ -180,7 +180,7 @@ template <typename Tag, typename F>
 AsyncScheduledWorker AsyncScheduledWorker::Create(async_context_t& context,
                                                   F&& do_work) {
   using SingletonType = Singleton<Tag, F>;
-  SingletonType::do_work = std::forward<F>(do_work);
+  SingletonType::do_work.emplace(do_work);
   State& state = SingletonType::state;
   state.context = &context;
   state.worker.do_work = &SingletonType::DoWork;
