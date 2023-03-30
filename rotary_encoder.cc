@@ -32,8 +32,6 @@ constexpr std::uint32_t kPinEventMask = GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL;
 
 }  // namespace
 
-std::int64_t RotaryEncoder::Read() { return state_->Read(); }
-
 void RotaryEncoder::State::Init(irq_handler_t edge_interrupt_handler) {
   critical_section_init(&counter_critical_section);
   for (unsigned pin : pins) {
@@ -57,10 +55,13 @@ void RotaryEncoder::State::HandleInterrupt() {
   // Pulses per full detent.
   const int divisor = 4;
   if (std::abs(fractional_counter) == divisor) {
-    // Full detent completed.
-    CriticalSectionLock lock(counter_critical_section);
-    counter += fractional_counter / divisor;
-    fractional_counter = 0;
+    {
+      // Full detent completed.
+      CriticalSectionLock lock(counter_critical_section);
+      counter += fractional_counter / divisor;
+      fractional_counter = 0;
+    }
+    async_worker.SetWorkPending();
   }
 }
 

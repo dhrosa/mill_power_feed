@@ -80,7 +80,7 @@ struct AsyncWorker::Singleton {
 template <typename Tag, IsAsyncWorkerFunctor F>
 AsyncWorker AsyncWorker::Create(async_context_t& context, F&& do_work) {
   using SingletonType = Singleton<Tag, F>;
-  SingletonType::do_work = std::forward<F>(do_work);
+  SingletonType::do_work.emplace(std::forward<F>(do_work));
   State& state = SingletonType::state;
   state.context = &context;
   state.worker.do_work = &SingletonType::DoWork;

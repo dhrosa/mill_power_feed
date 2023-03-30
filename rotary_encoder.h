@@ -9,6 +9,7 @@
 #include <initializer_list>
 #include <utility>
 
+#include "picopp/async.h"
 #include "picopp/irq.h"
 
 // Interrupt-based incremental rotary encoder reader. Accepting the pin numbers
@@ -26,11 +27,8 @@ class RotaryEncoder {
  public:
   // Must only be called once per pin pair. Creates the encoder instance and
   // sets up interrupt handlers for it.
-  template <unsigned pin_a, unsigned pin_b>
-  static RotaryEncoder Create();
-
-  // The current signed cumulative dedent count.
-  std::int64_t Read();
+  template <unsigned pin_a, unsigned pin_b, typename F>
+  static void Create(async_context_t& context, F&& handler);
 
  private:
   struct State;
@@ -43,6 +41,9 @@ class RotaryEncoder {
 struct RotaryEncoder::State {
   // The GPIO pin numbers for the encoder.
   std::array<unsigned, 2> pins;
+
+  AsyncWorker async_worker;
+
   // The current encoder pins values. This assumes encoder switches shorting the
   // pins to ground on contact; i.e. 1 is disconnected, 0 is connected.
   std::bitset<2> values = 0b11;
@@ -65,17 +66,15 @@ struct RotaryEncoder::State {
   std::int64_t Read();
 };
 
-template <unsigned pin_a, unsigned pin_b>
-RotaryEncoder RotaryEncoder::Create() {
+template <unsigned pin_a, unsigned pin_b, typename F>
+void RotaryEncoder::Create(async_context_t& context, F&& handler) {
   // Unique tag type for each pin pair.
   using Tag = std::integer_sequence<unsigned, pin_a, pin_b>;
   using Singleton = InterruptHandlerSingleton<Tag, State>;
-  
+
   State& state = Singleton::state;
   state.pins = {pin_a, pin_b};
+  state.async_worker = AsyncWorker::Create(
+      context, [handler]() { handler(Singleton::state.Read()); });
   state.Init(Singleton::interrupt_handler);
-
-  RotaryEncoder encoder;
-  encoder.state_ = &state;
-  return encoder;
 }
