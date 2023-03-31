@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <type_traits>
 
+#include "picopp/alarm.h"
 #include "picopp/async.h"
 #include "picopp/irq.h"
 
