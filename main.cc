@@ -8,13 +8,16 @@
 #include <array>
 #include <cstdio>
 #include <iostream>
+#include <span>
 #include <string>
 #include <tuple>
+#include <vector>
 
 #include "button.h"
 #include "digital_input.h"
 #include "picopp/async.h"
 #include "rotary_encoder.h"
+#include "shapeRenderer/ShapeRenderer.h"
 #include "ssd1306.h"
 #include "textRenderer/TextRenderer.h"
 
@@ -60,20 +63,29 @@ int main() {
 
   async_context_t& context = poll_context.core;
 
-  std::array<std::int64_t, 3> encoder_values = {};
+  struct Input {
+    std::int64_t encoder = 0;
+    bool button = false;
+  };
+  std::array<Input, 3> inputs = {};
+
   auto render_worker = AsyncWorker::Create(context, [&]() {
     const auto start_us = time_us_64();
     display.clear();
-    const unsigned char* font = font_12x16;
     const std::array<int, 2> positions[3] = {
         {0, 0},
         {64, 0},
         {0, 16},
     };
     for (int i = 0; i < 3; ++i) {
-      const auto text = std::to_string(encoder_values[i]);
-      auto [x, y] = positions[i];
-      pico_ssd1306::drawText(&display, font, text.c_str(), x, y);
+      const auto text = std::to_string(inputs[i].encoder);
+      const auto [x, y] = positions[i];
+      pico_ssd1306::drawText(&display, font_12x16, text.c_str(), x, y);
+      if (inputs[i].button) {
+        // Highlight the encoder value if the corresponding button is pressed.
+        pico_ssd1306::fillRect(&display, x, y, x + 64, y + 16,
+                               pico_ssd1306::WriteMode::INVERT);
+      }
     }
     display.sendBuffer();
   });
@@ -81,16 +93,15 @@ int main() {
 
   auto encoder_handler = [&](std::size_t index) {
     return [&, index](std::int64_t new_value) {
-      encoder_values[index] = new_value;
+      inputs[index].encoder = new_value;
       render_worker.SetWorkPending();
     };
   };
 
   auto button_handler = [&](std::size_t index) {
     return [&, index](bool pressed) {
-      std::cout << "button " << index << " "
-                << (pressed ? "pressed" : "released") << " at "
-                << (time_us_64() / 1000) << std::endl;
+      inputs[index].button = pressed;
+      render_worker.SetWorkPending();
     };
   };
 
