@@ -11,6 +11,7 @@
 #include <string>
 #include <tuple>
 
+#include "button.h"
 #include "digital_input.h"
 #include "picopp/async.h"
 #include "rotary_encoder.h"
@@ -85,9 +86,21 @@ int main() {
     };
   };
 
-  RotaryEncoder::Create<5, 21>(context, encoder_handler(0));
-  RotaryEncoder::Create<19, 18>(context, encoder_handler(1));
+  auto button_handler = [&](std::size_t index) {
+    return [&, index](bool pressed) {
+      std::cout << "button " << index << " "
+                << (pressed ? "pressed" : "released") << " at "
+                << (time_us_64() / 1000) << std::endl;
+    };
+  };
+
+  RotaryEncoder::Create<19, 18>(context, encoder_handler(0));
+  RotaryEncoder::Create<5, 21>(context, encoder_handler(1));
   RotaryEncoder::Create<16, 15>(context, encoder_handler(2));
+
+  Button::Create<20>(context, button_handler(0));
+  Button::Create<17>(context, button_handler(1));
+  Button::Create<25>(context, button_handler(2));
 
   auto background_worker =
       AsyncScheduledWorker::Create(context, []() -> absolute_time_t {
