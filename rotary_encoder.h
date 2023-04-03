@@ -75,6 +75,6 @@ void RotaryEncoder::Create(async_context_t& context, F&& handler) {
   State& state = Singleton::state;
   state.pins = {pin_a, pin_b};
   state.async_worker = AsyncWorker::Create(
-      context, [handler]() { handler(Singleton::state.Read()); });
+      context, [handler]() mutable { handler(Singleton::state.Read()); });
   state.Init(Singleton::interrupt_handler);
 }

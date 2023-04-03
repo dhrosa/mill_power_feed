@@ -18,6 +18,7 @@
 #include "picopp/async.h"
 #include "rotary_encoder.h"
 #include "shapeRenderer/ShapeRenderer.h"
+#include "speed_control.h"
 #include "ssd1306.h"
 #include "textRenderer/TextRenderer.h"
 
@@ -50,6 +51,16 @@ pico_ssd1306::SSD1306 CreateDisplay() {
   return display;
 }
 
+struct HandleSpeedEncoder {
+  SpeedControl& speed_control;
+
+  void operator()(std::int64_t encoder_value) {
+    const std::int64_t speed = encoder_value * 16;
+    std::cout << "Setting speed to : " << speed << std::endl;
+    speed_control.Set(speed);
+  }
+};
+
 int main() {
   stdio_usb_init();
   irq_set_enabled(IO_IRQ_BANK0, true);
@@ -57,6 +68,7 @@ int main() {
   std::cout << "startup" << std::endl;
 
   pico_ssd1306::SSD1306 display = CreateDisplay();
+  SpeedControl speed(133'000'000, 26, 27);
 
   async_context_poll_t poll_context;
   async_context_poll_init_with_defaults(&poll_context);
@@ -105,7 +117,8 @@ int main() {
     };
   };
 
-  RotaryEncoder::Create<19, 18>(context, encoder_handler(0));
+  // RotaryEncoder::Create<19, 18>(context, encoder_handler(0));
+  RotaryEncoder::Create<19, 18>(context, HandleSpeedEncoder{speed});
   RotaryEncoder::Create<5, 21>(context, encoder_handler(1));
   RotaryEncoder::Create<16, 15>(context, encoder_handler(2));
 
