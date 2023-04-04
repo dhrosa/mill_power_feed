@@ -6,6 +6,7 @@
 #include <pico/stdlib.h>
 
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <iostream>
 #include <span>
@@ -55,8 +56,7 @@ struct HandleSpeedEncoder {
   SpeedControl& speed_control;
 
   void operator()(std::int64_t encoder_value) {
-    const std::int64_t speed = encoder_value * 16;
-    std::cout << "Setting speed to : " << speed << std::endl;
+    const std::int64_t speed = std::pow(2, double(encoder_value) / 8);
     speed_control.Set(speed);
   }
 };
