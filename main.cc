@@ -102,11 +102,9 @@ int main() {
   background_worker.ScheduleAt(get_absolute_time());
 
   Oled oled(spi0, {.clock = 18, .data = 19, .reset = 25, .dc = 24, .cs = 29});
-  auto buffer = oled.Buffer();
-  for (int i = 0; i < oled.Height(); ++i) {
-    const int row = i;
-    const int col = i;
-    buffer[row * oled.Width() + col] = 1;
+  auto& buffer = oled.Buffer();
+  for (int i = 0; i < buffer.Height(); ++i) {
+    buffer(i, i) = 1;
   }
   oled.Update();
 

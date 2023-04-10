@@ -1,11 +1,12 @@
 #pragma once
 
 #include <cstdint>
-#include <span>
 #include <vector>
 
 #include "picopp/gpio.h"
 #include "picopp/spi.h"
+
+#include "oled_buffer.h"
 
 // SSD1309 display driver.
 class Oled {
@@ -25,8 +26,7 @@ class Oled {
   std::size_t Width() const { return width_; }
   std::size_t Height() const { return height_; }
 
-  // Row-major flat array, where each element corresponds to one pixel (0 or 1).
-  std::span<std::uint8_t> Buffer() { return buffer_; }
+  OledBuffer& Buffer() { return buffer_; }
 
   void Update();
 
@@ -45,6 +45,6 @@ class Oled {
   Gpio data_mode_;
   Gpio chip_select_;
 
-  std::vector<std::uint8_t> buffer_;
+  OledBuffer buffer_;
   std::vector<std::uint8_t> packed_buffer_;
 };

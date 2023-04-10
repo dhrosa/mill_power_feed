@@ -21,8 +21,8 @@ Oled::Oled(spi_inst_t* spi, Pins pins)
       reset_(pins.reset, {.polarity = Gpio::kNegative}),
       chip_select_(pins.cs, {.polarity = Gpio::kNegative}),
       data_mode_(pins.dc),
-      buffer_(width_ * height_),
-      packed_buffer_(buffer_.size() / 8) {
+      buffer_(width_, height_),
+      packed_buffer_(width_ * height_ / 8) {
   chip_select_.Set();
   Reset();
 }
@@ -52,7 +52,6 @@ void Oled::SendCommands(std::span<const std::uint8_t> commands) {
 }
 
 void Oled::Update() {
-  const std::span<const std::uint8_t> buffer = Buffer();
   const std::span<std::uint8_t> packed_buffer(packed_buffer_);
   for (std::size_t block_index = 0; block_index < packed_buffer.size();
        ++block_index) {
@@ -60,10 +59,10 @@ void Oled::Update() {
     packed_value = 0;
     const std::size_t block_column = block_index % width_;
     const std::size_t block_row = block_index / width_;
-    const std::uint8_t* bit = &buffer[(block_row * 8) * width_ + block_column];
+    const std::size_t x = block_column;
     for (std::size_t bit_index = 0; bit_index < 8; ++bit_index) {
-      packed_value |= (*bit) << bit_index;
-      bit += width_;
+      const std::size_t y = block_row * 8 + bit_index;
+      packed_value |= (buffer_(x, y)) << bit_index;
     }
   }
   DataMode();
