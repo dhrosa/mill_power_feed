@@ -30,9 +30,9 @@ class Gpio {
   const Config config_;
 };
 
-Gpio::Gpio(unsigned pin) : Gpio(pin, Config{}) {}
+inline Gpio::Gpio(unsigned pin) : Gpio(pin, Config{}) {}
 
-Gpio::Gpio(unsigned pin, Config config) : pin_(pin), config_(config) {
+inline Gpio::Gpio(unsigned pin, Config config) : pin_(pin), config_(config) {
   if (config_.function == GPIO_FUNC_SIO) {
     gpio_init(pin_);
     // Set pin to output.
@@ -43,7 +43,7 @@ Gpio::Gpio(unsigned pin, Config config) : pin_(pin), config_(config) {
   }
 }
 
-void Gpio::Set(bool value) {
+inline void Gpio::Set(bool value) {
   if (config_.polarity == kNegative) {
     value = !value;
   }

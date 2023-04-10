@@ -16,6 +16,7 @@
 
 #include "button.h"
 #include "digital_input.h"
+#include "oled.h"
 #include "picopp/async.h"
 #include "rotary_encoder.h"
 #include "shapeRenderer/ShapeRenderer.h"
@@ -67,7 +68,7 @@ int main() {
   sleep_ms(2000);
   std::cout << "startup" << std::endl;
 
-  pico_ssd1306::SSD1306 display = CreateDisplay();
+  // pico_ssd1306::SSD1306 display = CreateDisplay();
   SpeedControl speed(133'000'000, 26, 27);
 
   async_context_poll_t poll_context;
@@ -82,24 +83,24 @@ int main() {
   std::array<Input, 3> inputs = {};
 
   auto render_worker = AsyncWorker::Create(context, [&]() {
-    const auto start_us = time_us_64();
-    display.clear();
-    const std::array<int, 2> positions[3] = {
-        {0, 0},
-        {64, 0},
-        {0, 16},
-    };
-    for (int i = 0; i < 3; ++i) {
-      const auto text = std::to_string(inputs[i].encoder);
-      const auto [x, y] = positions[i];
-      pico_ssd1306::drawText(&display, font_12x16, text.c_str(), x, y);
-      if (inputs[i].button) {
-        // Highlight the encoder value if the corresponding button is pressed.
-        pico_ssd1306::fillRect(&display, x, y, x + 64, y + 16,
-                               pico_ssd1306::WriteMode::INVERT);
-      }
-    }
-    display.sendBuffer();
+    // const auto start_us = time_us_64();
+    // display.clear();
+    // const std::array<int, 2> positions[3] = {
+    //     {0, 0},
+    //     {64, 0},
+    //     {0, 16},
+    // };
+    // for (int i = 0; i < 3; ++i) {
+    //   const auto text = std::to_string(inputs[i].encoder);
+    //   const auto [x, y] = positions[i];
+    //   pico_ssd1306::drawText(&display, font_12x16, text.c_str(), x, y);
+    //   if (inputs[i].button) {
+    //     // Highlight the encoder value if the corresponding button is
+    //     pressed. pico_ssd1306::fillRect(&display, x, y, x + 64, y + 16,
+    //                            pico_ssd1306::WriteMode::INVERT);
+    //   }
+    // }
+    // display.sendBuffer();
   });
   render_worker.SetWorkPending();
 
@@ -117,14 +118,14 @@ int main() {
     };
   };
 
-  // RotaryEncoder::Create<19, 18>(context, encoder_handler(0));
-  RotaryEncoder::Create<19, 18>(context, HandleSpeedEncoder{speed});
-  RotaryEncoder::Create<5, 21>(context, encoder_handler(1));
-  RotaryEncoder::Create<16, 15>(context, encoder_handler(2));
+  // // RotaryEncoder::Create<19, 18>(context, encoder_handler(0));
+  // RotaryEncoder::Create<19, 18>(context, HandleSpeedEncoder{speed});
+  // RotaryEncoder::Create<5, 21>(context, encoder_handler(1));
+  // RotaryEncoder::Create<16, 15>(context, encoder_handler(2));
 
-  Button::Create<20>(context, button_handler(0));
-  Button::Create<17>(context, button_handler(1));
-  Button::Create<25>(context, button_handler(2));
+  // Button::Create<20>(context, button_handler(0));
+  // Button::Create<17>(context, button_handler(1));
+  // Button::Create<25>(context, button_handler(2));
 
   auto background_worker =
       AsyncScheduledWorker::Create(context, []() -> absolute_time_t {
@@ -133,6 +134,15 @@ int main() {
         return make_timeout_time_ms(1000);
       });
   background_worker.ScheduleAt(get_absolute_time());
+
+  Oled oled(spi0, {.clock = 18, .data = 19, .reset = 25, .dc = 24, .cs = 29});
+  auto buffer = oled.Buffer();
+  for (int i = 0; i < oled.Height(); ++i) {
+    const int row = i;
+    const int col = i;
+    buffer[row * oled.Width() + col] = 1;
+  }
+  oled.Update();
 
   while (true) {
     async_context_wait_for_work_until(&context, at_the_end_of_time);
