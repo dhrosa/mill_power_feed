@@ -19,39 +19,7 @@
 #include "oled.h"
 #include "picopp/async.h"
 #include "rotary_encoder.h"
-#include "shapeRenderer/ShapeRenderer.h"
 #include "speed_control.h"
-#include "ssd1306.h"
-#include "textRenderer/TextRenderer.h"
-
-void DrawCenteredValue(pico_ssd1306::SSD1306& display, int value) {
-  const unsigned char* font = font_16x32;
-  constexpr int line_width = 128;
-  constexpr int char_width = 16;
-  constexpr int chars_per_line = line_width / char_width;
-
-  std::array<char, chars_per_line + 1> buffer;
-  const int chars_written =
-      std::snprintf(buffer.data(), buffer.size(), "%+d", value);
-  const int left_padding = (chars_per_line - chars_written) / 2;
-
-  display.clear();
-  pico_ssd1306::drawText(&display, font, buffer.data(),
-                         left_padding * char_width, 0);
-  display.sendBuffer();
-}
-
-pico_ssd1306::SSD1306 CreateDisplay() {
-  i2c_init(i2c0, 1'000'000);
-  for (uint pin : {PICO_DEFAULT_I2C_SDA_PIN, PICO_DEFAULT_I2C_SCL_PIN}) {
-    gpio_set_function(pin, GPIO_FUNC_I2C);
-    gpio_pull_up(pin);
-  }
-  pico_ssd1306::SSD1306 display(i2c0, 0x3C, pico_ssd1306::Size::W128xH32);
-  display.clear();
-  display.sendBuffer();
-  return display;
-}
 
 struct HandleSpeedEncoder {
   SpeedControl& speed_control;
@@ -68,7 +36,6 @@ int main() {
   sleep_ms(2000);
   std::cout << "startup" << std::endl;
 
-  // pico_ssd1306::SSD1306 display = CreateDisplay();
   SpeedControl speed(133'000'000, 26, 27);
 
   async_context_poll_t poll_context;
@@ -84,7 +51,6 @@ int main() {
 
   auto render_worker = AsyncWorker::Create(context, [&]() {
     // const auto start_us = time_us_64();
-    // display.clear();
     // const std::array<int, 2> positions[3] = {
     //     {0, 0},
     //     {64, 0},

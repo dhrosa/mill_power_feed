@@ -11,13 +11,6 @@ project(power_feed LANGUAGES C CXX)
 pico_sdk_init()
 
 include(FetchContent)
-FetchContent_Declare(
-  pico_oled
-  GIT_REPOSITORY https://github.com/Harbys/pico-ssd1306.git
-  GIT_TAG master
-)
-
-FetchContent_MakeAvailable(pico_oled)
 
 add_executable(power_feed main.cc rotary_encoder.cc digital_input.cc speed_control.cc oled.cc)
 # We run over the default setting of 4.
@@ -30,7 +23,6 @@ target_link_libraries(power_feed
   pico_bootsel_via_double_reset
   hardware_pwm
   hardware_spi
-  pico_ssd1306
   hardware_i2c
 )
 
