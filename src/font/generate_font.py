@@ -6,6 +6,8 @@ import numpy as np
 
 Font = namedtuple("Font", ("char_data", "width", "height"))
 
+char_count = 95
+
 
 def load_font_data(image_path):
     from PIL import Image
@@ -18,7 +20,6 @@ def load_font_data(image_path):
         # Numpy array of 0's and 1's
         data = np.array(image.getdata()).reshape(height, image_width)
 
-    char_count = 95
     width = image_width // char_count
     # Array indexed by (char_num, row, col)
     char_data = np.array(np.hsplit(data, char_count))
@@ -26,7 +27,7 @@ def load_font_data(image_path):
     return Font(char_data, width, height)
 
 
-def char_to_blocks(font, i):
+def font_to_blocks(font):
     width = font.width
     # Each image is split up into blocks where each block is a byte of 8 contiguous
     # pixels vertically, where the LSB is the top-most pixel.
@@ -34,12 +35,16 @@ def char_to_blocks(font, i):
     # Pad char vertically so each column is a multiple of 8 pixels.
     blocks_per_column = ceil(font.height / 8)
     storage_height = 8 * blocks_per_column
-    pixels = font.char_data[i].copy()
-    pixels.resize(storage_height, font.width)
+    padding = (
+        (0, 0),
+        (0, storage_height - font.height),
+        (0, 0),
+    )
+    pixels = np.pad(font.char_data, padding)
 
-    # Pack bits over the row axis. Resulting shape will be (blocks_per_column,
-    # width).
-    packed = np.packbits(pixels, axis=0, bitorder="little")
+    # Pack bits over the row axis. Resulting shape will be (char_count,
+    # blocks_per_column, width).
+    packed = np.packbits(pixels, axis=1, bitorder="little")
     return packed.tobytes()
 
 
@@ -57,9 +62,7 @@ def main():
 
     args = parser.parse_args()
     font = load_font_data(args.image_path)
-    with args.output_path.open("wb") as output:
-        for i in range(len(font.char_data)):
-            output.write(char_to_blocks(font, i))
+    args.output_path.write_bytes(font_to_blocks(font))
 
 
 if __name__ == "__main__":
