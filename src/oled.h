@@ -46,5 +46,4 @@ class Oled {
   Gpio chip_select_;
 
   OledBuffer buffer_;
-  std::vector<std::uint8_t> packed_buffer_;
 };
