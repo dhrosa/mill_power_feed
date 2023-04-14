@@ -38,4 +38,4 @@ add_custom_command(
 
 add_library(font_data font_data.o)
 set_target_properties(font_data PROPERTIES LINKER_LANGUAGE C)
-target_link_libraries(font PRIVATE font_data)
+target_link_libraries(font PRIVATE font_data pico_platform)

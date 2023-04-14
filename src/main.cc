@@ -108,6 +108,7 @@ int main() {
     buffer(i, i) = 1;
   }
   oled.Update();
+  AllFonts();
 
   while (true) {
     async_context_wait_for_work_until(&context, at_the_end_of_time);
