@@ -1,0 +1,9 @@
+#include "font.h"
+
+@font_includes@
+
+namespace {
+const Font kAllFonts[] = {@font_functions@};
+}  // namespace 
+
+std::span<const Font> AllFonts() { return kAllFonts; }

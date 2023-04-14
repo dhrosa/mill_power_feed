@@ -16,6 +16,7 @@
 
 #include "button.h"
 #include "digital_input.h"
+#include "font/font.h"
 #include "oled.h"
 #include "picopp/async.h"
 #include "rotary_encoder.h"
@@ -107,6 +108,10 @@ int main() {
     buffer(i, i) = 1;
   }
   oled.Update();
+
+  for (const Font& font : AllFonts()) {
+    std::cout << font.width << " " << font.height << std::endl;
+  }
 
   while (true) {
     async_context_wait_for_work_until(&context, at_the_end_of_time);

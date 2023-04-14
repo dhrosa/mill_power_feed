@@ -62,7 +62,9 @@ def main():
 
     args = parser.parse_args()
     font = load_font_data(args.image_path)
-    args.output_path.write_bytes(font_to_blocks(font))
+    with args.output_path.open('wb') as output:
+        output.write(bytes([font.width, font.height]))
+        output.write(font_to_blocks(font))
 
 
 if __name__ == "__main__":
