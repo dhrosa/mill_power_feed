@@ -48,23 +48,33 @@ def font_to_blocks(font):
     return packed.tobytes()
 
 
+def serialize_font(font):
+    return bytes([font.width, font.height]) + font_to_blocks(font)
+
+
 def main():
     from argparse import ArgumentParser
     from sys import stdout
 
     parser = ArgumentParser()
     parser.add_argument(
-        "image_path",
+        "image_paths",
         type=Path,
+        nargs="+",
         help="Path to image of monospace font consisting of the horizontal concatenation of the ASCII range [' ', '~'].",
     )
-    parser.add_argument("output_path", type=Path, help="Path to write block blob to.")
+    parser.add_argument(
+        "--output", "-o", type=Path, help="Path to write block blob to."
+    )
 
     args = parser.parse_args()
-    font = load_font_data(args.image_path)
-    with args.output_path.open('wb') as output:
-        output.write(bytes([font.width, font.height]))
-        output.write(font_to_blocks(font))
+    num_fonts = len(args.image_paths)
+
+    with args.output.open("wb") as output:
+        output.write(bytes([num_fonts]))
+        for path in args.image_paths:
+            font = load_font_data(path)
+            output.write(serialize_font(font))
 
 
 if __name__ == "__main__":

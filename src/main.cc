@@ -109,10 +109,6 @@ int main() {
   }
   oled.Update();
 
-  for (const Font& font : AllFonts()) {
-    std::cout << font.width << " " << font.height << std::endl;
-  }
-
   while (true) {
     async_context_wait_for_work_until(&context, at_the_end_of_time);
     async_context_poll(&context);
