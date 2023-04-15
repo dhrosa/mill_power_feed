@@ -45,5 +45,6 @@ class Oled {
   Gpio data_mode_;
   Gpio chip_select_;
 
+  std::vector<std::uint8_t> data_;
   OledBuffer buffer_;
 };

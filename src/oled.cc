@@ -21,7 +21,8 @@ Oled::Oled(spi_inst_t* spi, Pins pins)
       reset_(pins.reset, {.polarity = Gpio::kNegative}),
       chip_select_(pins.cs, {.polarity = Gpio::kNegative}),
       data_mode_(pins.dc),
-      buffer_(width_, height_) {
+      data_(width_ * height_ / 8),
+      buffer_(data_, width_, height_) {
   chip_select_.Set();
   Reset();
 }

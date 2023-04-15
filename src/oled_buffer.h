@@ -2,13 +2,18 @@
 
 #include <cstdint>
 #include <span>
-#include <vector>
 
+// Allows addressing individual bits in a packed bitmap by (x, y) coordinate.
+//
+// Data internally is stored as a row-major array of 8-bit vertically-oriented
+// blocks, with the LSB oriented towards the top (greatest y-value) row of the
+// image.
 class OledBuffer {
  public:
   class Pixel;
 
-  OledBuffer(std::size_t width, std::size_t height);
+  OledBuffer(std::span<std::uint8_t> data, std::size_t width,
+             std::size_t height);
 
   Pixel operator()(std::size_t x, std::size_t y);
 
@@ -32,7 +37,7 @@ class OledBuffer {
   };
 
  private:
+  std::span<std::uint8_t> data_;
   const std::size_t width_;
   const std::size_t height_;
-  std::vector<std::uint8_t> data_;
 };

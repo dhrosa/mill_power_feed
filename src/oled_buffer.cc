@@ -12,8 +12,9 @@ void OledBuffer::Pixel::operator=(bool value) {
   }
 }
 
-OledBuffer::OledBuffer(std::size_t width, std::size_t height)
-    : width_(width), height_(height), data_(width_ * height_ / 8) {}
+OledBuffer::OledBuffer(std::span<std::uint8_t> data, std::size_t width,
+                       std::size_t height)
+    : data_(data), width_(width), height_(height) {}
 
 auto OledBuffer::operator()(std::size_t x, std::size_t y) -> Pixel {
   const std::size_t block_col = x;
