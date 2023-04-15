@@ -22,7 +22,7 @@ Oled::Oled(spi_inst_t* spi, Pins pins)
       chip_select_(pins.cs, {.polarity = Gpio::kNegative}),
       data_mode_(pins.dc),
       data_(width_ * height_ / 8),
-      buffer_(data_, width_, height_) {
+      buffer_(data_.data(), width_, height_) {
   chip_select_.Set();
   Reset();
 }
@@ -53,5 +53,5 @@ void Oled::SendCommands(std::span<const std::uint8_t> commands) {
 
 void Oled::Update() {
   DataMode();
-  spi_.Write(buffer_.PackedData());
+  spi_.Write(buffer_.Span());
 }

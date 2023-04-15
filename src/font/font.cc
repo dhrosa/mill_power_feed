@@ -25,7 +25,8 @@ std::vector<Font> LoadFonts() {
     // Round height up to multiple of 8 for pointer arithmetic.
     const std::size_t blocks_per_column = (font.height + 7) / 8;
     const std::size_t storage_height = blocks_per_column * 8;
-    const std::size_t data_size = font.width * storage_height * kNumChars / 8;
+    font.bytes_per_char = font.width * storage_height / 8;
+    const std::size_t data_size = font.bytes_per_char * kNumChars;
     font.data = std::span(font_data, data_size);
     total_data_size += data_size;
     font_data += data_size;

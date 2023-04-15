@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <span>
 
+#include "font/font.h"
+
 // Allows addressing individual bits in a packed bitmap by (x, y) coordinate.
 //
 // Data internally is stored as a row-major array of 8-bit vertically-oriented
@@ -12,8 +14,7 @@ class OledBuffer {
  public:
   class Pixel;
 
-  OledBuffer(std::span<std::uint8_t> data, std::size_t width,
-             std::size_t height);
+  OledBuffer(uint8_t* data, std::size_t width, std::size_t height);
 
   Pixel operator()(std::size_t x, std::size_t y);
 
@@ -22,10 +23,17 @@ class OledBuffer {
 
   void Clear();
 
-  std::span<const std::uint8_t> PackedData() const { return data_; }
+  std::span<const std::uint8_t> Span() const;
+  std::span<std::uint8_t> Span();
 
+  void DrawChar(const Font& font, char letter, std::uint8_t x0,
+                std::uint8_t y0);
+
+  // Allows read/write access to individual bits of the image as if they were
+  // boolean values.
   class Pixel {
    public:
+    operator bool() const;
     void operator=(bool value);
 
    private:
@@ -37,7 +45,7 @@ class OledBuffer {
   };
 
  private:
-  std::span<std::uint8_t> data_;
+  std::uint8_t* const data_;
   const std::size_t width_;
   const std::size_t height_;
 };
