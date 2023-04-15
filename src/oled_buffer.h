@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <span>
+#include <string_view>
 
 #include "font/font.h"
 
@@ -26,8 +27,10 @@ class OledBuffer {
   std::span<const std::uint8_t> Span() const;
   std::span<std::uint8_t> Span();
 
-  void DrawChar(const Font& font, char letter, std::uint8_t x0,
-                std::uint8_t y0);
+  void DrawChar(const Font& font, char letter, std::size_t x0, std::size_t y0);
+
+  void DrawString(const Font& font, std::string_view text, std::size_t x0,
+                  std::size_t y0);
 
   // Allows read/write access to individual bits of the image as if they were
   // boolean values.

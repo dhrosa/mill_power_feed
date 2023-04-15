@@ -25,13 +25,13 @@ std::span<std::uint8_t> OledBuffer::Span() {
   return {data_, width_ * height_ / 8};
 }
 
-void OledBuffer::DrawChar(const Font& font, char letter, std::uint8_t x0,
-                          std::uint8_t y0) {
+void OledBuffer::DrawChar(const Font& font, char letter, std::size_t x0,
+                          std::size_t y0) {
   OledBuffer font_data(const_cast<std::uint8_t*>(font[letter]), font.width,
                        font.height);
 
-  const auto x1 = std::min<std::size_t>(width_, x0 + font.width);
-  const auto y1 = std::min<std::size_t>(height_, y0 + font.height);
+  const auto x1 = std::min(width_, x0 + font.width);
+  const auto y1 = std::min(height_, y0 + font.height);
 
   const std::size_t width = x1 - x0;
   const std::size_t height = y1 - y0;
@@ -39,6 +39,14 @@ void OledBuffer::DrawChar(const Font& font, char letter, std::uint8_t x0,
     for (std::size_t dy = 0; dy < height; ++dy) {
       (*this)(x0 + dx, y0 + dy) = bool(font_data(dx, dy));
     }
+  }
+}
+
+void OledBuffer::DrawString(const Font& font, std::string_view text,
+                            std::size_t x0, std::size_t y0) {
+  for (char letter : text) {
+    DrawChar(font, letter, x0, y0);
+    x0 += font.width;
   }
 }
 
