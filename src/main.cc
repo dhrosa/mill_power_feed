@@ -50,24 +50,21 @@ int main() {
   };
   std::array<Input, 3> inputs = {};
 
+  Oled oled(spi0, {.clock = 18, .data = 19, .reset = 25, .dc = 24, .cs = 29});
+  auto& buffer = oled.Buffer();
   auto render_worker = AsyncWorker::Create(context, [&]() {
-    // const auto start_us = time_us_64();
-    // const std::array<int, 2> positions[3] = {
-    //     {0, 0},
-    //     {64, 0},
-    //     {0, 16},
-    // };
-    // for (int i = 0; i < 3; ++i) {
-    //   const auto text = std::to_string(inputs[i].encoder);
-    //   const auto [x, y] = positions[i];
-    //   pico_ssd1306::drawText(&display, font_12x16, text.c_str(), x, y);
-    //   if (inputs[i].button) {
-    //     // Highlight the encoder value if the corresponding button is
-    //     pressed. pico_ssd1306::fillRect(&display, x, y, x + 64, y + 16,
-    //                            pico_ssd1306::WriteMode::INVERT);
-    //   }
-    // }
-    // display.sendBuffer();
+    // buffer.Clear();
+    // // const std::array<int, 2> positions[3] = {
+    // //     {0, 0},
+    // //     {64, 0},
+    // //     {0, 16},
+    // // };
+    // // for (int i = 0; i < 3; ++i) {
+    // //   const auto text = std::to_string(inputs[i].encoder);
+    // //   const auto [x, y] = positions[i];
+    // //   buffer.DrawString(font, text, x, y);
+    // // }
+    // oled.Update();
   });
   render_worker.SetWorkPending();
 
@@ -102,13 +99,25 @@ int main() {
       });
   background_worker.ScheduleAt(get_absolute_time());
 
-  Oled oled(spi0, {.clock = 18, .data = 19, .reset = 25, .dc = 24, .cs = 29});
-  auto& buffer = oled.Buffer();
-  for (int i = 0; i < buffer.Height(); ++i) {
-    buffer(i, i) = 1;
-  }
-  oled.Update();
-  AllFonts();
+  auto text_render_worker =
+      AsyncScheduledWorker::Create(context, [&]() -> absolute_time_t {
+        const std::uint64_t time_us = time_us_64();
+        const std::size_t frame_num = time_us / 500'000;
+        int i = 0;
+        int x = 0;
+        int y = 0;
+        buffer.Clear();
+        auto buffer = oled.Buffer();
+        for (const Font& font : AllFonts()) {
+          const char letter = ((frame_num + i) % 95) + ' ';
+          buffer.DrawChar(font, letter, x, y);
+          x += font.width * 15 / 8;
+          ++i;
+        }
+        oled.Update();
+        return make_timeout_time_ms(10);
+      });
+  text_render_worker.ScheduleAt(get_absolute_time());
 
   while (true) {
     async_context_wait_for_work_until(&context, at_the_end_of_time);
