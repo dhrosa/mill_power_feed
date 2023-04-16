@@ -14,21 +14,27 @@ add_custom_command(
 
 add_custom_target(venv DEPENDS venv.stamp)
 
-set(font_images font_5x8.png font_6x12.png font_8x16.png font_12x24.png
-                font_16x32.png font_32x64.png)
+set(bdf_prefix "${spleen-font_SOURCE_DIR}/spleen-")
+set(sizes 5x8 6x12 8x16 12x24 16x32 32x64)
+set(bdf_suffix ".bdf")
 
-foreach(image ${font_images})
-  cmake_path(APPEND CMAKE_CURRENT_SOURCE_DIR ${image} OUTPUT_VARIABLE
-             image_path)
-  list(APPEND font_image_paths ${image_path})
+foreach(size ${sizes})
+  list(APPEND bdf_paths "${bdf_prefix}${size}${bdf_suffix}")
 endforeach()
+message(STATUS "${bdf_paths}")
+
+# add_custom_command(
+#   OUTPUT font_data.bin
+#   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+#   COMMAND touch font_data.bin
+# )
 
 add_custom_command(
   OUTPUT font_data.bin
   DEPENDS venv generate_fonts.py ${font_images}
   COMMAND
     ${venv_path}/bin/python3 "${CMAKE_CURRENT_SOURCE_DIR}/generate_fonts.py"
-    ${font_image_paths} -o font_data.bin)
+    ${bdf_paths} -o font_data.bin)
 
 add_custom_command(
   OUTPUT font_data.o

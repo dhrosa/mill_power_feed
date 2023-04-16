@@ -11,4 +11,9 @@ project(power_feed LANGUAGES C CXX)
 pico_sdk_init()
 
 include(FetchContent)
+FetchContent_Declare(
+  spleen-font
+  GIT_REPOSITORY https://github.com/fcambus/spleen
+)
+FetchContent_MakeAvailable(spleen-font)
 add_subdirectory(src)
