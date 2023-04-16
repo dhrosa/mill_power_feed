@@ -21,13 +21,6 @@ set(bdf_suffix ".bdf")
 foreach(size ${sizes})
   list(APPEND bdf_paths "${bdf_prefix}${size}${bdf_suffix}")
 endforeach()
-message(STATUS "${bdf_paths}")
-
-# add_custom_command(
-#   OUTPUT font_data.bin
-#   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-#   COMMAND touch font_data.bin
-# )
 
 add_custom_command(
   OUTPUT font_data.bin
