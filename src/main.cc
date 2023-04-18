@@ -52,19 +52,20 @@ int main() {
 
   Oled oled(spi0, {.clock = 18, .data = 19, .reset = 25, .dc = 24, .cs = 29});
   auto& buffer = oled.Buffer();
+  const Font& font = FontForHeight(32);
   auto render_worker = AsyncWorker::Create(context, [&]() {
-    // buffer.Clear();
-    // // const std::array<int, 2> positions[3] = {
-    // //     {0, 0},
-    // //     {64, 0},
-    // //     {0, 16},
-    // // };
-    // // for (int i = 0; i < 3; ++i) {
-    // //   const auto text = std::to_string(inputs[i].encoder);
-    // //   const auto [x, y] = positions[i];
-    // //   buffer.DrawString(font, text, x, y);
-    // // }
-    // oled.Update();
+    buffer.Clear();
+    const std::array<int, 2> positions[3] = {
+        {0, 0},
+        {64, 0},
+        {0, 32},
+    };
+    for (int i = 0; i < 3; ++i) {
+      const auto text = std::to_string(inputs[i].encoder);
+      const auto [x, y] = positions[i];
+      buffer.DrawString(font, text, x, y);
+    }
+    oled.Update();
   });
   render_worker.SetWorkPending();
 
@@ -82,14 +83,13 @@ int main() {
     };
   };
 
-  // // RotaryEncoder::Create<19, 18>(context, encoder_handler(0));
-  // RotaryEncoder::Create<19, 18>(context, HandleSpeedEncoder{speed});
-  // RotaryEncoder::Create<5, 21>(context, encoder_handler(1));
-  // RotaryEncoder::Create<16, 15>(context, encoder_handler(2));
+  RotaryEncoder::Create<13, 12>(context, encoder_handler(0));
+  RotaryEncoder::Create<10, 9>(context, encoder_handler(1));
+  RotaryEncoder::Create<7, 3>(context, encoder_handler(2));
 
-  // Button::Create<20>(context, button_handler(0));
-  // Button::Create<17>(context, button_handler(1));
-  // Button::Create<25>(context, button_handler(2));
+  Button::Create<11>(context, button_handler(0));
+  Button::Create<6>(context, button_handler(1));
+  Button::Create<2>(context, button_handler(2));
 
   auto background_worker =
       AsyncScheduledWorker::Create(context, []() -> absolute_time_t {
@@ -98,26 +98,6 @@ int main() {
         return make_timeout_time_ms(1000);
       });
   background_worker.ScheduleAt(get_absolute_time());
-
-  auto text_render_worker =
-      AsyncScheduledWorker::Create(context, [&]() -> absolute_time_t {
-        const std::uint64_t time_us = time_us_64();
-        const std::size_t frame_num = time_us / 500'000;
-        int i = 0;
-        int x = 0;
-        int y = 0;
-        buffer.Clear();
-        auto buffer = oled.Buffer();
-        for (const Font& font : AllFonts()) {
-          const char letter = ((frame_num + i) % 95) + ' ';
-          buffer.DrawChar(font, letter, x, y);
-          x += font.width * 15 / 8;
-          ++i;
-        }
-        oled.Update();
-        return make_timeout_time_ms(10);
-      });
-  text_render_worker.ScheduleAt(get_absolute_time());
 
   while (true) {
     async_context_wait_for_work_until(&context, at_the_end_of_time);
