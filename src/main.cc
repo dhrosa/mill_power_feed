@@ -19,6 +19,8 @@
 #include "font/font.h"
 #include "oled.h"
 #include "picopp/async.h"
+#include "picoro/async.h"
+#include "picoro/task.h"
 #include "rotary_encoder.h"
 #include "speed_control.h"
 
@@ -34,8 +36,23 @@ struct HandleSpeedEncoder {
 int main() {
   stdio_usb_init();
   irq_set_enabled(IO_IRQ_BANK0, true);
-  sleep_ms(2000);
-  std::cout << "startup" << std::endl;
+
+  Oled oled(spi0, {.clock = 18, .data = 19, .reset = 25, .dc = 24, .cs = 29});
+  auto& buffer = oled.Buffer();
+
+  for (int i = 3; i >= 0; --i) {
+    const Font& font = FontForHeight(64);
+    std::cout << "Starting in " << i << " seconds" << std::endl;
+    buffer.Clear();
+    buffer.DrawString(font, std::to_string(i),
+                      (buffer.Width() - font.width) / 2, 0);
+    oled.Update();
+    sleep_ms(1000);
+  }
+  std::cout << "Startup" << std::endl;
+
+  buffer.Clear();
+  oled.Update();
 
   SpeedControl speed(133'000'000, 26, 27);
 
@@ -50,15 +67,13 @@ int main() {
   };
   std::array<Input, 3> inputs = {};
 
-  Oled oled(spi0, {.clock = 18, .data = 19, .reset = 25, .dc = 24, .cs = 29});
-  auto& buffer = oled.Buffer();
   const Font& font = FontForHeight(32);
   auto render_worker = AsyncWorker::Create(context, [&]() {
     buffer.Clear();
-    const std::array<int, 2> positions[3] = {
+    const std::array<std::size_t, 2> positions[3] = {
         {0, 0},
-        {64, 0},
-        {0, 32},
+        {buffer.Width() / 2, 0},
+        {0, buffer.Height() / 2},
     };
     for (int i = 0; i < 3; ++i) {
       const auto text = std::to_string(inputs[i].encoder);

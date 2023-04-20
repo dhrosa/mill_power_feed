@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 set(CMAKE_CXX_STANDARD 20)
 
-#set(PICO_BOARD arduino_nano_rp2040_connect)
 set(PICO_BOARD adafruit_feather_rp2040)
 set(PICO_SDK_FETCH_FROM_GIT on)
 
