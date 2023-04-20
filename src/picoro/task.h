@@ -2,7 +2,7 @@
 
 #include <coroutine>
 
-#include "picopp/semaphore.h"
+#include "picoro/notification.h"
 
 class Task {
  public:
@@ -22,7 +22,7 @@ class Task {
 };
 
 struct Task::promise_type {
-  Semaphore complete{0, 1};
+  Notification complete;
 
   Task get_return_object() {
     return {std::coroutine_handle<promise_type>::from_promise(*this)};
@@ -32,8 +32,8 @@ struct Task::promise_type {
 
   auto final_suspend() noexcept {
     struct Awaiter : std::suspend_always {
-      Semaphore& complete;
-      void await_suspend(std::coroutine_handle<>) { complete.Release(); }
+      Notification& complete;
+      void await_suspend(std::coroutine_handle<>) { complete.Notify(); }
     };
     return Awaiter{.complete = complete};
   };
@@ -58,5 +58,5 @@ inline void Task::Wait() {
     return;
   }
   handle_.resume();
-  handle_.promise().complete.Acquire();
+  handle_.promise().complete.Wait();
 }
