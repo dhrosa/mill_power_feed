@@ -24,20 +24,11 @@
 #include "rotary_encoder.h"
 #include "speed_control.h"
 
-struct HandleSpeedEncoder {
-  SpeedControl& speed_control;
-
-  void operator()(std::int64_t encoder_value) {
-    const std::int64_t speed = std::pow(2, double(encoder_value) / 8);
-    speed_control.Set(speed);
-  }
-};
-
 int main() {
   stdio_usb_init();
   irq_set_enabled(IO_IRQ_BANK0, true);
 
-  Oled oled(spi0, {.clock = 18, .data = 19, .reset = 25, .dc = 24, .cs = 29});
+  Oled oled(spi0, {.clock = 2, .data = 3, .reset = 4, .dc = 5, .cs = 6});
   auto& buffer = oled.Buffer();
 
   for (int i = 3; i >= 0; --i) {
@@ -53,8 +44,6 @@ int main() {
 
   buffer.Clear();
   oled.Update();
-
-  SpeedControl speed(133'000'000, 26, 27);
 
   async_context_poll_t poll_context;
   async_context_poll_init_with_defaults(&poll_context);
@@ -98,13 +87,13 @@ int main() {
     };
   };
 
-  RotaryEncoder::Create<13, 12>(context, encoder_handler(0));
-  RotaryEncoder::Create<10, 9>(context, encoder_handler(1));
-  RotaryEncoder::Create<7, 3>(context, encoder_handler(2));
+  RotaryEncoder::Create<22, 26>(context, encoder_handler(0));
+  RotaryEncoder::Create<19, 20>(context, encoder_handler(1));
+  RotaryEncoder::Create<17, 16>(context, encoder_handler(2));
 
-  Button::Create<11>(context, button_handler(0));
-  Button::Create<6>(context, button_handler(1));
-  Button::Create<2>(context, button_handler(2));
+  Button::Create<27>(context, button_handler(0));
+  Button::Create<21>(context, button_handler(1));
+  Button::Create<18>(context, button_handler(2));
 
   auto background_worker =
       AsyncScheduledWorker::Create(context, []() -> absolute_time_t {

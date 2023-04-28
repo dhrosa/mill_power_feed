@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 set(CMAKE_CXX_STANDARD 20)
 
-set(PICO_BOARD adafruit_feather_rp2040)
+set(PICO_BOARD pico)
 set(PICO_SDK_FETCH_FROM_GIT on)
 
 include(pico_sdk_import.cmake)
