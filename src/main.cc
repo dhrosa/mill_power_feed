@@ -87,9 +87,27 @@ int main() {
     };
   };
 
-  RotaryEncoder::Create<22, 26>(context, encoder_handler(0));
-  RotaryEncoder::Create<19, 20>(context, encoder_handler(1));
-  RotaryEncoder::Create<17, 16>(context, encoder_handler(2));
+  // RotaryEncoder::Create<22, 26>(context, encoder_handler(0));
+  // RotaryEncoder::Create<19, 20>(context, encoder_handler(1));
+  // RotaryEncoder::Create<17, 16>(context, encoder_handler(2));
+  RotaryEncoder encoders[] = {
+      RotaryEncoder::Create<22, 26>(context),
+      RotaryEncoder::Create<19, 20>(context),
+      RotaryEncoder::Create<17, 16>(context),
+  };
+
+  auto encoder_task = [](auto& encoders, auto& inputs, auto& render_worker,
+                         std::size_t index) -> Task {
+    while (true) {
+      const std::int64_t value = co_await encoders[index];
+      std::cout << value << std::endl;
+      inputs[index].encoder = value;
+      render_worker.SetWorkPending();
+    }
+    co_return;
+  };
+
+  auto task = encoder_task(encoders, inputs, render_worker, 0);
 
   Button::Create<27>(context, button_handler(0));
   Button::Create<21>(context, button_handler(1));
@@ -99,7 +117,7 @@ int main() {
       AsyncScheduledWorker::Create(context, []() -> absolute_time_t {
         std::cout << "heartbeat @" << (time_us_64() / 1000) << "ms"
                   << std::endl;
-        return make_timeout_time_ms(1000);
+        return make_timeout_time_ms(10'000);
       });
   background_worker.ScheduleAt(get_absolute_time());
 

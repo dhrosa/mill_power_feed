@@ -1,16 +1,22 @@
 #pragma once
 
 #include <hardware/gpio.h>
+#include <hardware/timer.h>
+#include <pico/async_context.h>
 #include <pico/sync.h>
 
 #include <array>
 #include <bitset>
+#include <coroutine>
 #include <cstdint>
 #include <initializer_list>
+#include <iostream>
+#include <optional>
 #include <utility>
 
-#include "picopp/async.h"
+#include "picopp/critical_section.h"
 #include "picopp/irq.h"
+#include "picoro/async.h"
 
 // Interrupt-based incremental rotary encoder reader. Accepting the pin numbers
 // as template arguments rather than runtime parameters allows us to instantiate
@@ -25,24 +31,66 @@
 // https://github.com/tobiglaser/RP2040-Encoder/
 class RotaryEncoder {
  public:
-  // Must only be called once per pin pair. Creates the encoder instance and
-  // sets up interrupt handlers for it.
-  template <unsigned pin_a, unsigned pin_b, typename F>
-  static void Create(async_context_t& context, F&& handler);
+  // Must only be called once per pin pair.
+  template <unsigned pin_a, unsigned pin_b>
+  static RotaryEncoder Create(async_context_t& context);
+
+  auto operator co_await();
 
  private:
+  class Waiter;
   struct State;
-  State* state_;
+
+  RotaryEncoder(State& state) : state_(state) {}
+  State& state_;
 };
 
 // Internal implementation details below.
+
+class RotaryEncoder::Waiter {
+ public:
+  Waiter(async_context_t& context) : executor_(context) {}
+
+  bool await_ready() {
+    mutex_.Lock();
+    return counter_.has_value();
+  }
+
+  void await_suspend(std::coroutine_handle<> handle) {
+    pending_ = handle;
+    mutex_.Unlock();
+  }
+
+  std::int64_t await_resume() {
+    CriticalSectionLock lock(mutex_);
+    const std::int64_t value = *counter_;
+    counter_.reset();
+    return value;
+  }
+
+  void Send(std::int64_t counter) {
+    CriticalSectionLock lock(mutex_);
+    if (counter_ == counter) {
+      return;
+    }
+    counter_ = counter;
+    if (std::coroutine_handle<> pending = std::exchange(pending_, nullptr)) {
+      executor_.Schedule(pending);
+    }
+  }
+
+ private:
+  AsyncExecutor executor_;
+
+  CriticalSection mutex_;
+  std::optional<std::int64_t> counter_;
+  std::coroutine_handle<> pending_;
+};
 
 // Global state per encoder.
 struct RotaryEncoder::State {
   // The GPIO pin numbers for the encoder.
   std::array<unsigned, 2> pins;
-
-  AsyncWorker async_worker;
 
   // The current encoder pins values. This assumes encoder switches shorting the
   // pins to ground on contact; i.e. 1 is disconnected, 0 is connected.
@@ -52,29 +100,59 @@ struct RotaryEncoder::State {
   // to a new detent.
   int fractional_counter = 0;
 
-  critical_section_t counter_critical_section;
   // Signed cumulative full dedents measured.
   std::int64_t counter = 0;
+
+  // Only nullopt to allow for default construction. This is populated before
+  // Init().
+  std::optional<Waiter> waiter;
 
   // Setup pins and register the given interrupt handler for this pin pair.
   void Init(irq_handler_t edge_interrupt_handler);
 
   // Handle an edge transition on either signal.
   void HandleInterrupt();
-
-  // The current signed cumulative dedent count.
-  std::int64_t Read();
 };
 
-template <unsigned pin_a, unsigned pin_b, typename F>
-void RotaryEncoder::Create(async_context_t& context, F&& handler) {
+template <unsigned pin_a, unsigned pin_b>
+RotaryEncoder RotaryEncoder::Create(async_context_t& context) {
   // Unique tag type for each pin pair.
   using Tag = std::integer_sequence<unsigned, pin_a, pin_b>;
   using Singleton = InterruptHandlerSingleton<Tag, State>;
 
   State& state = Singleton::state;
   state.pins = {pin_a, pin_b};
-  state.async_worker = AsyncWorker::Create(
-      context, [handler]() mutable { handler(Singleton::state.Read()); });
+  state.waiter.emplace(context);
   state.Init(Singleton::interrupt_handler);
+
+  return RotaryEncoder(state);
+}
+
+// For some reason directly returning a reference to the Waiter results in the
+// await_* methods of Waiter being called with an incorrect 'this' pointer in
+// GCC 12.2. Possibly due to https://gcc.gnu.org/bugzilla/show_bug.cgi?id=104872
+inline auto RotaryEncoder::operator co_await() {
+  struct Wrapper {
+    Waiter& waiter;
+
+    std::int64_t ready_us;
+    std::int64_t suspend_us;
+    std::int64_t resume_us;
+
+    bool await_ready() {
+      ready_us = time_us_64();
+      return waiter.await_ready();
+    }
+    void await_suspend(std::coroutine_handle<> h) {
+      suspend_us = time_us_64();
+      waiter.await_suspend(h);
+    }
+    auto await_resume() {
+      resume_us = time_us_64();
+      std::cout << ready_us << " " << (suspend_us - ready_us) << " "
+                << (resume_us - suspend_us) << std::endl;
+      return waiter.await_resume();
+    }
+  };
+  return Wrapper{.waiter = *state_.waiter};
 }

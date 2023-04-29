@@ -1,7 +1,5 @@
 #include "rotary_encoder.h"
 
-#include "picopp/critical_section.h"
-
 namespace {
 // Mapping of `abAB` values to fractional counter increments, where `ab` are the
 // bits representing the previous readings of the encoder pins, and `AB` are the
@@ -33,7 +31,6 @@ constexpr std::uint32_t kPinEventMask = GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL;
 }  // namespace
 
 void RotaryEncoder::State::Init(irq_handler_t edge_interrupt_handler) {
-  critical_section_init(&counter_critical_section);
   for (unsigned pin : pins) {
     gpio_init(pin);
     gpio_pull_up(pin);
@@ -51,21 +48,19 @@ void RotaryEncoder::State::HandleInterrupt() {
   }
   const unsigned transition =
       (previous_values.to_ulong() << 2) | values.to_ulong();
-  fractional_counter += kIncrementsTable[transition];
+
+  const auto increment = kIncrementsTable[transition];
+  if (increment == 0) {
+    return;
+  }
+  fractional_counter += increment;
   // Pulses per full detent.
   const int divisor = 4;
-  if (std::abs(fractional_counter) == divisor) {
-    {
-      // Full detent completed.
-      CriticalSectionLock lock(counter_critical_section);
-      counter += fractional_counter / divisor;
-      fractional_counter = 0;
-    }
-    async_worker.SetWorkPending();
+  if (std::abs(fractional_counter) != divisor) {
+    return;
   }
-}
-
-std::int64_t RotaryEncoder::State::Read() {
-  CriticalSectionLock lock(counter_critical_section);
-  return counter;
+  // Full detent completed.
+  counter += fractional_counter / divisor;
+  fractional_counter = 0;
+  waiter->Send(counter);
 }
