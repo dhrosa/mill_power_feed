@@ -1,7 +1,6 @@
 #pragma once
 
 #include <hardware/gpio.h>
-#include <hardware/timer.h>
 #include <pico/async_context.h>
 #include <pico/sync.h>
 
@@ -10,7 +9,6 @@
 #include <coroutine>
 #include <cstdint>
 #include <initializer_list>
-#include <iostream>
 #include <optional>
 #include <utility>
 
@@ -135,24 +133,9 @@ inline auto RotaryEncoder::operator co_await() {
   struct Wrapper {
     Waiter& waiter;
 
-    std::int64_t ready_us;
-    std::int64_t suspend_us;
-    std::int64_t resume_us;
-
-    bool await_ready() {
-      ready_us = time_us_64();
-      return waiter.await_ready();
-    }
-    void await_suspend(std::coroutine_handle<> h) {
-      suspend_us = time_us_64();
-      waiter.await_suspend(h);
-    }
-    auto await_resume() {
-      resume_us = time_us_64();
-      std::cout << ready_us << " " << (suspend_us - ready_us) << " "
-                << (resume_us - suspend_us) << std::endl;
-      return waiter.await_resume();
-    }
+    bool await_ready() { return waiter.await_ready(); }
+    void await_suspend(std::coroutine_handle<> h) { waiter.await_suspend(h); }
+    auto await_resume() { return waiter.await_resume(); }
   };
   return Wrapper{.waiter = *state_.waiter};
 }

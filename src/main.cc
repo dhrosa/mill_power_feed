@@ -61,8 +61,8 @@ int main() {
     buffer.Clear();
     const std::array<std::size_t, 2> positions[3] = {
         {0, 0},
-        {buffer.Width() / 2, 0},
         {0, buffer.Height() / 2},
+        {buffer.Width() / 2, 0},
     };
     for (int i = 0; i < 3; ++i) {
       const auto text = std::to_string(inputs[i].encoder);
@@ -87,27 +87,28 @@ int main() {
     };
   };
 
-  // RotaryEncoder::Create<22, 26>(context, encoder_handler(0));
-  // RotaryEncoder::Create<19, 20>(context, encoder_handler(1));
-  // RotaryEncoder::Create<17, 16>(context, encoder_handler(2));
   RotaryEncoder encoders[] = {
       RotaryEncoder::Create<22, 26>(context),
       RotaryEncoder::Create<19, 20>(context),
       RotaryEncoder::Create<17, 16>(context),
   };
 
-  auto encoder_task = [](auto& encoders, auto& inputs, auto& render_worker,
-                         std::size_t index) -> Task {
-    while (true) {
-      const std::int64_t value = co_await encoders[index];
-      std::cout << value << std::endl;
-      inputs[index].encoder = value;
-      render_worker.SetWorkPending();
-    }
-    co_return;
+  auto encoder_task = [&](std::size_t index) -> Task {
+    return [](RotaryEncoder& encoder, Input& input,
+              AsyncWorker& render_worker) -> Task {
+      while (true) {
+        const std::int64_t value = co_await encoder;
+        input.encoder = value;
+        render_worker.SetWorkPending();
+      }
+    }(encoders[index], inputs[index], render_worker);
   };
 
-  auto task = encoder_task(encoders, inputs, render_worker, 0);
+  Task tasks[] = {
+      encoder_task(0),
+      encoder_task(1),
+      encoder_task(2),
+  };
 
   Button::Create<27>(context, button_handler(0));
   Button::Create<21>(context, button_handler(1));
