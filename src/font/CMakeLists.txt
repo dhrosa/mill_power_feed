@@ -32,7 +32,7 @@ add_custom_command(
 add_custom_command(
   OUTPUT font_data.o
   DEPENDS font_data.bin
-  COMMAND arm-none-eabi-ld --relocatable --format=binary -z noexecstack
+  COMMAND arm-none-eabi-ld --relocatable --format=binary
           --output font_data.o font_data.bin)
 
 add_library(font_data font_data.o)
