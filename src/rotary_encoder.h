@@ -29,10 +29,12 @@
 // https://github.com/tobiglaser/RP2040-Encoder/
 class RotaryEncoder {
  public:
-  // Must only be called once per pin pair.
+  // Must only be called once per pin pair. Coroutines awaiting on this encoder
+  // will resume execution on `context`. Not thread-safe.
   template <unsigned pin_a, unsigned pin_b>
   static RotaryEncoder Create(async_context_t& context);
 
+  // Awaits an update to the rotary encoder dedent count (int64).
   auto operator co_await();
 
  private:
@@ -45,18 +47,19 @@ class RotaryEncoder {
 
 // Internal implementation details below.
 
+// Waits for counter updates from interrupts.
 class RotaryEncoder::Waiter {
  public:
   Waiter(async_context_t& context) : executor_(context) {}
 
   bool await_ready() {
-    mutex_.Lock();
+    CriticalSectionLock lock(mutex_);
     return counter_.has_value();
   }
 
   void await_suspend(std::coroutine_handle<> handle) {
+    CriticalSectionLock lock(mutex);
     pending_ = handle;
-    mutex_.Unlock();
   }
 
   std::int64_t await_resume() {

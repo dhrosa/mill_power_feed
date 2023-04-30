@@ -4,15 +4,23 @@
 
 #include <coroutine>
 
+// Allows resumption of a coroutine onto an async_context. Each executor
+// instance can manage at most one suspended coroutine.
 class AsyncExecutor {
  public:
+  // Not thread-safe.
   AsyncExecutor(async_context_t& context);
   ~AsyncExecutor();
 
   void operator=(const AsyncExecutor&) = delete;
 
+  // An awaitable object that suspends the current coroutine and resumes it on
+  // the async_context. Thread-safe.
   auto Schedule();
 
+  // Schedules a suspended coroutine for resumption on the async_context. This
+  // method returns immediately and does not wait for the coroutine to resume.
+  // Thread-safe.
   void Schedule(std::coroutine_handle<> handle);
 
  private:

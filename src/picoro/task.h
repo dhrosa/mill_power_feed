@@ -4,6 +4,9 @@
 
 #include "picoro/notification.h"
 
+// Simple coroutine with no return value. Execution is eager: the body of the
+// coroutine will start executing immediately and continue until the first
+// suspension point.
 class Task {
  public:
   struct promise_type;
@@ -13,6 +16,7 @@ class Task {
 
   ~Task();
 
+  // Blocks until the coroutine has finished execution.
   void Wait();
 
  private:
@@ -57,6 +61,5 @@ inline void Task::Wait() {
   if (!handle_) {
     return;
   }
-  handle_.resume();
   handle_.promise().complete.Wait();
 }
