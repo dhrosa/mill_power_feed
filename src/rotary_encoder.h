@@ -58,12 +58,14 @@ class RotaryEncoder::Waiter {
     return counter_.has_value();
   }
 
-  void await_suspend(std::coroutine_handle<> handle) {
-    // TODO(dhrosa): If an update happens between await_ready() and
-    // await_suspend(), then we miss the update and unneccessarily block until
-    // the next update.
+  bool await_suspend(std::coroutine_handle<> handle) {
     CriticalSectionLock lock(mutex);
+    if (counter_.has_value()) {
+      // Racing update between await_ready() and await_suspend().
+      return false;
+    }
     pending_ = handle;
+    return true;
   }
 
   std::int64_t await_resume() {
