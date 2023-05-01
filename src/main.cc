@@ -18,7 +18,6 @@
 #include "digital_input.h"
 #include "font/font.h"
 #include "oled.h"
-#include "picopp/async.h"
 #include "picoro/async.h"
 #include "picoro/task.h"
 #include "rotary_encoder.h"
@@ -112,13 +111,13 @@ int main() {
       button_task(0),  button_task(1),  button_task(2),
   };
 
-  auto background_worker =
-      AsyncScheduledWorker::Create(context, []() -> absolute_time_t {
-        std::cout << "heartbeat @" << (time_us_64() / 1000) << "ms"
-                  << std::endl;
-        return make_timeout_time_ms(10'000);
-      });
-  background_worker.ScheduleAt(get_absolute_time());
+  auto background_task = [](async_context_t& context) -> Task {
+    AsyncExecutor executor(context);
+    while (true) {
+      std::cout << "heartbeat @" << (time_us_64() / 1000) << "ms" << std::endl;
+      co_await executor.SleepUntil(make_timeout_time_ms(3'000));
+    }
+  }(context);
 
   while (true) {
     async_context_wait_for_work_until(&context, at_the_end_of_time);
