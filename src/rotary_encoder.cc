@@ -1,5 +1,7 @@
 #include "rotary_encoder.h"
 
+#include <iostream>
+
 namespace {
 // Mapping of `abAB` values to fractional counter increments, where `ab` are the
 // bits representing the previous readings of the encoder pins, and `AB` are the
@@ -53,6 +55,8 @@ void RotaryEncoder::State::HandleInterrupt() {
   if (increment == 0) {
     return;
   }
+  std::cout << "Encoder HandleInterrupt this=" << this << " pins=" << pins[0]
+            << " " << pins[1] << std::endl;
   fractional_counter += increment;
   // Pulses per full detent.
   const int divisor = 4;

@@ -73,20 +73,6 @@ int main() {
   });
   render_worker.SetWorkPending();
 
-  auto encoder_handler = [&](std::size_t index) {
-    return [&, index](std::int64_t new_value) {
-      inputs[index].encoder = new_value;
-      render_worker.SetWorkPending();
-    };
-  };
-
-  auto button_handler = [&](std::size_t index) {
-    return [&, index](bool pressed) {
-      inputs[index].button = pressed;
-      render_worker.SetWorkPending();
-    };
-  };
-
   RotaryEncoder encoders[] = {
       RotaryEncoder::Create<22, 26>(context),
       RotaryEncoder::Create<19, 20>(context),
@@ -94,25 +80,37 @@ int main() {
   };
 
   auto encoder_task = [&](std::size_t index) -> Task {
-    return [](RotaryEncoder& encoder, Input& input,
+    return [](std::size_t index, RotaryEncoder& encoder, Input& input,
               AsyncWorker& render_worker) -> Task {
       while (true) {
         const std::int64_t value = co_await encoder;
         input.encoder = value;
         render_worker.SetWorkPending();
+
+        std::cout << "Encoder " << index << "event: " << value << std::endl;
       }
-    }(encoders[index], inputs[index], render_worker);
+    }(index, encoders[index], inputs[index], render_worker);
+  };
+
+  Button buttons[] = {
+      Button::Create<27>(context),
+      Button::Create<21>(context),
+      Button::Create<18>(context),
+  };
+
+  auto button_task = [&](std::size_t index) -> Task {
+    return [](std::size_t index, Button& button) -> Task {
+      while (true) {
+        const bool value = co_await button;
+        std::cout << "Button " << index << " event: " << value << std::endl;
+      }
+    }(index, buttons[index]);
   };
 
   Task tasks[] = {
-      encoder_task(0),
-      encoder_task(1),
-      encoder_task(2),
+      encoder_task(0), encoder_task(1), encoder_task(2),
+      button_task(0),  button_task(1),  button_task(2),
   };
-
-  Button::Create<27>(context, button_handler(0));
-  Button::Create<21>(context, button_handler(1));
-  Button::Create<18>(context, button_handler(2));
 
   auto background_worker =
       AsyncScheduledWorker::Create(context, []() -> absolute_time_t {

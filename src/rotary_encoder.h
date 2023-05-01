@@ -15,6 +15,7 @@
 #include "picopp/critical_section.h"
 #include "picopp/irq.h"
 #include "picoro/async.h"
+#include "picoro/awaitable_reference.h"
 
 // Interrupt-based incremental rotary encoder reader. Accepting the pin numbers
 // as template arguments rather than runtime parameters allows us to instantiate
@@ -58,6 +59,9 @@ class RotaryEncoder::Waiter {
   }
 
   void await_suspend(std::coroutine_handle<> handle) {
+    // TODO(dhrosa): If an update happens between await_ready() and
+    // await_suspend(), then we miss the update and unneccessarily block until
+    // the next update.
     CriticalSectionLock lock(mutex);
     pending_ = handle;
   }
@@ -129,16 +133,6 @@ RotaryEncoder RotaryEncoder::Create(async_context_t& context) {
   return RotaryEncoder(state);
 }
 
-// For some reason directly returning a reference to the Waiter results in the
-// await_* methods of Waiter being called with an incorrect 'this' pointer in
-// GCC 12.2. Possibly due to https://gcc.gnu.org/bugzilla/show_bug.cgi?id=104872
 inline auto RotaryEncoder::operator co_await() {
-  struct Wrapper {
-    Waiter& waiter;
-
-    bool await_ready() { return waiter.await_ready(); }
-    void await_suspend(std::coroutine_handle<> h) { waiter.await_suspend(h); }
-    auto await_resume() { return waiter.await_resume(); }
-  };
-  return Wrapper{.waiter = *state_.waiter};
+  return AwaitableReference(*state_.waiter);
 }
