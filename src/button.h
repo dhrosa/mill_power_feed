@@ -1,7 +1,6 @@
 #pragma once
 
 #include <coroutine>
-#include <iostream>
 #include <optional>
 #include <utility>
 
@@ -17,6 +16,8 @@ class Button {
 
   void operator=(const Button&) = delete;
 
+  // Awaits an update to the button state; returns true if the button is being
+  // pressed, and false if the button is released.
   auto operator co_await();
 
  private:

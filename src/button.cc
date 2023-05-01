@@ -20,8 +20,6 @@ void Button::State::HandleInterrupt() {
   if ((events & kPinEventMask) == 0) {
     return;
   }
-  std::cout << "Button HandleInterrupt this=" << this << " pin=" << pin
-            << std::hex << events << std::endl;
   gpio_acknowledge_irq(pin, kPinEventMask);
   const bool value = gpio_get(pin);
   waiter->Send(value);
