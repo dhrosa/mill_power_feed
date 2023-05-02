@@ -21,6 +21,6 @@ void Button::State::HandleInterrupt() {
     return;
   }
   gpio_acknowledge_irq(pin, kPinEventMask);
-  const bool value = gpio_get(pin);
+  const bool value = !gpio_get(pin);
   waiter->Send(value);
 }
