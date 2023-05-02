@@ -1,11 +1,14 @@
 #pragma once
 
+#include <hardware/sync.h>
 #include <pico/sync.h>
 
 class CriticalSection {
  public:
-  CriticalSection() { critical_section_init(&section_); }
-  ~CriticalSection() { critical_section_deinit(&section_); }
+  CriticalSection() {
+    critical_section_init_with_lock_num(&section_,
+                                        next_striped_spin_lock_num());
+  }
   critical_section_t& get() { return section_; }
 
   void Lock() { critical_section_enter_blocking(&section_); }
