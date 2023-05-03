@@ -42,8 +42,8 @@ class RotaryEncoder {
   class Waiter;
   struct State;
 
-  RotaryEncoder(State& state) : state_(state) {}
-  State& state_;
+  RotaryEncoder(State* state) : state_(state) {}
+  State* state_;
 };
 
 // Internal implementation details below.
@@ -132,9 +132,9 @@ RotaryEncoder RotaryEncoder::Create(async_context_t& context) {
   state.waiter.emplace(context);
   state.Init(Singleton::interrupt_handler);
 
-  return RotaryEncoder(state);
+  return RotaryEncoder(&state);
 }
 
 inline auto RotaryEncoder::operator co_await() {
-  return AwaitableReference(*state_.waiter);
+  return AwaitableReference(*state_->waiter);
 }

@@ -24,8 +24,8 @@ class Button {
   struct State;
   class Waiter;
 
-  Button(State& state) : state_(state) {}
-  State& state_;
+  Button(State* state) : state_(state) {}
+  State* state_;
 };
 
 class Button::Waiter {
@@ -92,9 +92,9 @@ Button Button::Create(async_context_t& context) {
   state.waiter.emplace(context);
   state.Init(Singleton::interrupt_handler);
 
-  return Button(state);
+  return Button(&state);
 }
 
 inline auto Button::operator co_await() {
-  return AwaitableReference(*state_.waiter);
+  return AwaitableReference(*state_->waiter);
 }

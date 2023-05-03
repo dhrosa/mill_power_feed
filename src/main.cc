@@ -19,105 +19,138 @@
 #include "font/font.h"
 #include "oled.h"
 #include "picoro/async.h"
+#include "picoro/event.h"
 #include "picoro/task.h"
 #include "rotary_encoder.h"
 #include "speed_control.h"
 
-int main() {
-  stdio_usb_init();
-  irq_set_enabled(IO_IRQ_BANK0, true);
+struct Controller {
+  async_context_t& context;
+  Oled oled;
+  OledBuffer& buffer;
+  RotaryEncoder encoders[3];
+  Button buttons[3];
+  Button left_button;
+  Button right_button;
+  SpeedControl speed_control;
+  Event update_event;
 
-  Oled oled(spi0, {.clock = 2, .data = 3, .reset = 4, .dc = 5, .cs = 6});
-  auto& buffer = oled.Buffer();
+  Controller(async_context_t& context)
+      : context(context),
+        oled(spi0, {.clock = 2, .data = 3, .reset = 4, .dc = 5, .cs = 6}),
+        buffer(oled.Buffer()),
+        encoders{
+            RotaryEncoder::Create<22, 26>(context),
+            RotaryEncoder::Create<19, 20>(context),
+            RotaryEncoder::Create<17, 16>(context),
+        },
+        buttons{
+            Button::Create<27>(context),
+            Button::Create<21>(context),
+            Button::Create<18>(context),
+        },
+        left_button(Button::Create<13>(context)),
+        right_button(Button::Create<14>(context)),
+        speed_control(133'000'000, 1, 0),
+        update_event(context) {
+    const double initial_ipm = 1;
+    level = fine_steps_per_octave * std::log2(ppi * initial_ipm / 60);
 
-  for (int i = 3; i >= 0; --i) {
-    const Font& font = FontForHeight(64);
-    std::cout << "Starting in " << i << " seconds" << std::endl;
-    buffer.Clear();
-    buffer.DrawString(font, std::to_string(i),
-                      (buffer.Width() - font.width) / 2, 0);
-    oled.Update();
-    sleep_ms(1000);
+    Startup();
+    CreateTasks();
   }
-  std::cout << "Startup" << std::endl;
 
-  buffer.Clear();
-  oled.Update();
-
-  async_context_poll_t poll_context;
-  async_context_poll_init_with_defaults(&poll_context);
-
-  async_context_t& context = poll_context.core;
-
-  struct Input {
-    std::int64_t encoder = 0;
-    bool button = false;
-  };
-  std::array<Input, 3> inputs = {};
-
-  const Font& font = FontForHeight(32);
-  auto render_worker = AsyncWorker::Create(context, [&]() {
-    buffer.Clear();
-    const std::array<std::size_t, 2> positions[3] = {
-        {0, 0},
-        {0, buffer.Height() / 2},
-        {buffer.Width() / 2, 0},
-    };
-    for (int i = 0; i < 3; ++i) {
-      const auto text = std::to_string(inputs[i].encoder);
-      const auto [x, y] = positions[i];
-      buffer.DrawString(font, text, x, y);
+  void Startup() {
+    for (int i = 3; i >= 0; --i) {
+      const Font& font = FontForHeight(64);
+      std::cout << "Starting in " << i << " seconds" << std::endl;
+      buffer.Clear();
+      buffer.DrawString(font, std::to_string(i),
+                        (buffer.Width() - font.width) / 2, 0);
+      oled.Update();
+      sleep_ms(1000);
     }
+    buffer.Clear();
     oled.Update();
-  });
-  render_worker.SetWorkPending();
+    std::cout << "Startup" << std::endl;
+  }
 
-  RotaryEncoder encoders[] = {
-      RotaryEncoder::Create<22, 26>(context),
-      RotaryEncoder::Create<19, 20>(context),
-      RotaryEncoder::Create<17, 16>(context),
-  };
+  std::vector<Task> tasks;
 
-  auto encoder_task = [&](std::size_t index) -> Task {
-    return [](std::size_t index, RotaryEncoder& encoder, Input& input,
-              AsyncWorker& render_worker) -> Task {
-      while (true) {
-        const std::int64_t value = co_await encoder;
-        input.encoder = value;
-        render_worker.SetWorkPending();
+  void CreateTasks() {
+    const auto add = [&](Task task) { tasks.push_back(std::move(task)); };
+    add(BackgroundTask());
+    add(EncoderTask(encoders[0], 1));
+    add(EncoderTask(encoders[1], coarse_multiplier));
+    add(DirectionButtonTask(left_button, -1));
+    add(DirectionButtonTask(right_button, +1));
+    add(UpdateTask());
+  }
 
-        std::cout << "Encoder " << index << "event: " << value << std::endl;
-      }
-    }(index, encoders[index], inputs[index], render_worker);
-  };
-
-  Button buttons[] = {
-      Button::Create<27>(context),
-      Button::Create<21>(context),
-      Button::Create<18>(context),
-  };
-
-  auto button_task = [&](std::size_t index) -> Task {
-    return [](std::size_t index, Button& button) -> Task {
-      while (true) {
-        const bool value = co_await button;
-        std::cout << "Button " << index << " event: " << value << std::endl;
-      }
-    }(index, buttons[index]);
-  };
-
-  Task tasks[] = {
-      encoder_task(0), encoder_task(1), encoder_task(2),
-      button_task(0),  button_task(1),  button_task(2),
-  };
-
-  auto background_task = [](async_context_t& context) -> Task {
+  Task BackgroundTask() {
     AsyncExecutor executor(context);
     while (true) {
       std::cout << "heartbeat @" << (time_us_64() / 1000) << "ms" << std::endl;
       co_await executor.SleepUntil(make_timeout_time_ms(3'000));
     }
-  }(context);
+  }
+
+  std::int64_t level = 0;
+  int direction = 0;
+  const std::int64_t ppr = 8000;
+  const std::int64_t tpi = 20;
+  const std::int64_t ppi = ppr * tpi;
+  static constexpr std::int64_t fine_steps_per_octave = 160;
+  static constexpr std::int64_t coarse_multiplier = 4;
+
+  Task EncoderTask(RotaryEncoder& encoder, std::int64_t multiplier) {
+    std::int64_t previous = 0;
+    while (true) {
+      const std::int64_t current = co_await encoder;
+      const std::int64_t delta = current - previous;
+      level += delta * multiplier;
+      update_event.Notify();
+    }
+  }
+
+  Task DirectionButtonTask(Button& button, int button_direction) {
+    while (true) {
+      const bool pressed = co_await button;
+      if (pressed) {
+        direction = button_direction;
+      } else if (direction == button_direction) {
+        direction = 0;
+      }
+      update_event.Notify();
+    }
+  }
+
+  Task UpdateTask() {
+    while (true) {
+      std::cout << "Level: " << level << " frequency: " << frequency()
+                << " IPM: " << ipm() << " direction: " << direction
+                << std::endl;
+      co_await update_event;
+    }
+  }
+
+  double frequency() const {
+    return std::exp2(static_cast<double>(level) / fine_steps_per_octave);
+  }
+
+  double ipm(double frequency) const { return frequency * 60 / ppi; }
+  double ipm() const { return frequency() * 60 / ppi; }
+};
+
+int main() {
+  stdio_usb_init();
+  irq_set_enabled(IO_IRQ_BANK0, true);
+
+  async_context_poll_t poll_context;
+  async_context_poll_init_with_defaults(&poll_context);
+
+  async_context_t& context = poll_context.core;
+  Controller controller(context);
 
   while (true) {
     async_context_wait_for_work_until(&context, at_the_end_of_time);

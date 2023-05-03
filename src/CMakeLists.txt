@@ -3,7 +3,7 @@ add_subdirectory(font)
 add_executable(power_feed main.cc button.cc rotary_encoder.cc digital_input.cc
                           speed_control.cc oled.cc oled_buffer.cc)
 # We run over the default setting of 4.
-target_compile_definitions(power_feed PRIVATE PICO_MAX_SHARED_IRQ_HANDLERS=16)
+target_compile_definitions(power_feed PRIVATE PICO_MAX_SHARED_IRQ_HANDLERS=32)
 target_include_directories(power_feed PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 target_compile_options(power_feed PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fcoroutines>)
 

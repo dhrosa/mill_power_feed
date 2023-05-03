@@ -6,7 +6,7 @@ class SpeedControl {
  public:
   SpeedControl(std::int64_t sys_clock_hz, unsigned pulse_pin, unsigned dir_pin);
 
-  void Set(std::int64_t freq_hz);
+  void Set(double freq_hz);
 
  private:
   const std::int64_t sys_clock_hz_;
