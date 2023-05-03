@@ -76,12 +76,16 @@ class RotaryEncoder::Waiter {
   }
 
   void Send(std::int64_t counter) {
-    CriticalSectionLock lock(mutex_);
-    if (counter_ == counter) {
-      return;
+    std::coroutine_handle<> pending;
+    {
+      CriticalSectionLock lock(mutex_);
+      if (counter_ == counter) {
+        return;
+      }
+      counter_ = counter;
+      std::swap(pending, pending_);
     }
-    counter_ = counter;
-    if (std::coroutine_handle<> pending = std::exchange(pending_, nullptr)) {
+    if (pending) {
       executor_.Schedule(pending);
     }
   }

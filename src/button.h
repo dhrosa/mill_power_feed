@@ -55,13 +55,17 @@ class Button::Waiter {
   }
 
   void Send(bool value) {
-    CriticalSectionLock lock(mutex_);
-    if (value == value_) {
-      return;
+    std::coroutine_handle<> pending;
+    {
+      CriticalSectionLock lock(mutex_);
+      if (value == value_) {
+        return;
+      }
+      value_ = value;
+      std::swap(pending, pending_);
     }
-    value_ = value;
-    if (pending_) {
-      executor_.Schedule(std::exchange(pending_, nullptr));
+    if (pending) {
+      executor_.Schedule(pending);
     }
   }
 
