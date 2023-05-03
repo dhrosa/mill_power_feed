@@ -1,7 +1,6 @@
-#include <hardware/gpio.h>
 #include <hardware/i2c.h>
-#include <hardware/pwm.h>
 #include <hardware/timer.h>
+#include <hardware/watchdog.h>
 #include <pico/async_context_poll.h>
 #include <pico/stdlib.h>
 
@@ -108,6 +107,7 @@ struct Controller {
     while (true) {
       const std::int64_t current = co_await encoder;
       const std::int64_t delta = current - previous;
+      previous = current;
       level += delta * multiplier;
       update_event.Notify();
     }
@@ -152,9 +152,17 @@ int main() {
   async_context_t& context = poll_context.core;
   Controller controller(context);
 
+  if (watchdog_enable_caused_reboot()) {
+    std::cout << "Last reboot triggered by watchdog." << std::endl;
+  }
+  const bool pause_on_debug = false;
+  const std::uint32_t watchdog_timeout_ms = 5000;
+  watchdog_enable(watchdog_timeout_ms, pause_on_debug);
+
   while (true) {
     async_context_wait_for_work_until(&context, at_the_end_of_time);
     async_context_poll(&context);
+    watchdog_update();
   }
   return 0;
 }
