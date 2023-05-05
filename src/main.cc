@@ -61,7 +61,7 @@ struct Controller {
   }
 
   void Startup() {
-    for (int i = 3; i >= 0; --i) {
+    for (int i = 2; i >= 0; --i) {
       const Font& font = FontForHeight(64);
       std::cout << "Starting in " << i << " seconds" << std::endl;
       buffer.Clear();
@@ -81,7 +81,7 @@ struct Controller {
     const auto add = [&](Task task) { tasks.push_back(std::move(task)); };
     add(BackgroundTask());
     add(EncoderTask(encoders[0], 1));
-    add(EncoderTask(encoders[1], coarse_multiplier));
+    add(EncoderTask(encoders[2], coarse_multiplier));
     add(DirectionButtonTask(left_button, -1));
     add(DirectionButtonTask(right_button, +1));
     add(UpdateTask());
@@ -127,8 +127,9 @@ struct Controller {
   }
 
   Task UpdateTask() {
-    auto draw_speed = [&](double value, std::string_view unit, int x, int y) {
-      const auto f = &FontForHeight;
+    auto draw_speed = [&](double value, std::string_view unit, int y) {
+      const Font& value_font = FontForHeight(24);
+      const Font& unit_font = FontForHeight(8);
       std::ostringstream ss;
       // Always shows 5 characters including the decimal marker.
       if (value > 1000) {
@@ -138,16 +139,19 @@ struct Controller {
       } else {
         ss << std::setprecision(3) << value;
       }
-
       const std::string_view value_str = ss.view();
-      buffer.DrawString(f(24), value_str, x, y);
+
+      // Center the speed text, which is 6.5 characters wide: 5 from the value
+      // and 1.5 from the units.
+      int x = (buffer.Width() - 13 * value_font.width / 2) / 2;
+      buffer.DrawString(value_font, value_str, x, y);
       x += value_str.size() * 12;
       // unit-per-minute fraction drawn so that it takes up 1 digit height
       // vertically, 2 digit widths horizontally, and lining up with the top
       // and bottom edges of the digit text.
-      buffer.DrawString(f(8), unit, x + 7, y + 3);
+      buffer.DrawString(unit_font, unit, x + 7, y + 3);
       buffer.DrawLineH(y + 11, x + 4, x + 20);
-      buffer.DrawString(f(8), "min", x + 5, y + 12);
+      buffer.DrawString(unit_font, "min", x + 5, y + 12);
     };
 
     while (true) {
@@ -157,8 +161,16 @@ struct Controller {
 
       buffer.Clear();
 
-      draw_speed(ipm(), "in", 0, 0);
-      draw_speed(25.4 * ipm(), "mm", 0, 24);
+      draw_speed(ipm(), "in", 0);
+      draw_speed(25.4 * ipm(), "mm", 24);
+
+      // Encoder labels.
+      const Font& label_font = FontForHeight(8);
+      buffer.DrawString(label_font, "Fine", 0,
+                        buffer.Height() - label_font.height);
+      buffer.DrawString(label_font, "Coarse",
+                        buffer.Width() - 6 * label_font.width,
+                        buffer.Height() - label_font.height);
 
       oled.Update();
       co_await update_event;
