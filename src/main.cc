@@ -17,6 +17,7 @@
 #include "digital_input.h"
 #include "font/font.h"
 #include "oled.h"
+#include "picopp/gpio.h"
 #include "picoro/async.h"
 #include "picoro/event.h"
 #include "picoro/task.h"
@@ -29,8 +30,8 @@ struct Controller {
   OledBuffer& buffer;
   RotaryEncoder encoders[3];
   Button buttons[3];
-  Button left_button;
-  Button right_button;
+  Gpio left_button;
+  Gpio right_button;
   SpeedControl speed_control;
   Event update_event;
 
@@ -48,8 +49,10 @@ struct Controller {
             Button::Create<21>(context),
             Button::Create<18>(context),
         },
-        left_button(Button::Create<13>(context)),
-        right_button(Button::Create<14>(context)),
+        left_button(
+            Gpio(13, {.direction = Gpio::kInput, .polarity = Gpio::kNegative})),
+        right_button(
+            Gpio(14, {.direction = Gpio::kInput, .polarity = Gpio::kNegative})),
         speed_control(133'000'000, 1, 0),
         update_event(context) {
     const double initial_ipm = 1;
@@ -82,8 +85,7 @@ struct Controller {
     add(BackgroundTask());
     add(EncoderTask(encoders[0], 1));
     add(EncoderTask(encoders[2], coarse_multiplier));
-    add(DirectionButtonTask(left_button, -1));
-    add(DirectionButtonTask(right_button, +1));
+    add(DirectionTask());
     add(UpdateTask());
   }
 
@@ -114,22 +116,27 @@ struct Controller {
     }
   }
 
-  Task DirectionButtonTask(Button& button, int button_direction) {
+  Task DirectionTask() {
+    AsyncExecutor executor(context);
     while (true) {
-      const bool pressed = co_await button;
-      if (pressed) {
-        direction = button_direction;
-      } else if (direction == button_direction) {
-        direction = 0;
+      int new_direction = 0;
+      if (left_button) {
+        new_direction = -1;
+      } else if (right_button) {
+        new_direction = 1;
       }
-      update_event.Notify();
+      if (new_direction != direction) {
+        direction = new_direction;
+        update_event.Notify();
+      }
+      co_await executor.SleepUntil(make_timeout_time_ms(50));
     }
   }
 
   Task UpdateTask() {
+    const Font& value_font = FontForHeight(24);
+    const Font& unit_font = FontForHeight(8);
     auto draw_speed = [&](double value, std::string_view unit, int y) {
-      const Font& value_font = FontForHeight(24);
-      const Font& unit_font = FontForHeight(8);
       std::ostringstream ss;
       // Always shows 5 characters including the decimal marker.
       if (value > 1000) {
@@ -153,26 +160,44 @@ struct Controller {
       buffer.DrawLineH(y + 11, x + 4, x + 20);
       buffer.DrawString(unit_font, "min", x + 5, y + 12);
     };
-
-    while (true) {
-      std::cout << "Level: " << level << " frequency: " << frequency()
-                << " IPM: " << ipm() << " direction: " << direction
-                << std::endl;
-
-      buffer.Clear();
-
-      draw_speed(ipm(), "in", 0);
-      draw_speed(25.4 * ipm(), "mm", 24);
-
-      // Encoder labels.
+    const Font& arrow_font = FontForHeight(32);
+    auto draw_arrow = [&] {
+      if (direction == 0) {
+        return;
+      }
+      int x;
+      const int y = value_font.height - (arrow_font.height / 2);
+      char arrow_char;
+      if (direction == -1) {
+        arrow_char = '<';
+        x = 0;
+      } else {
+        arrow_char = '>';
+        x = buffer.Width() - arrow_font.width;
+      }
+      buffer.DrawChar(arrow_font, arrow_char, x, y);
+    };
+    auto draw_labels = [&] {
       const Font& label_font = FontForHeight(8);
       buffer.DrawString(label_font, "Fine", 0,
                         buffer.Height() - label_font.height);
       buffer.DrawString(label_font, "Coarse",
                         buffer.Width() - 6 * label_font.width,
                         buffer.Height() - label_font.height);
+    };
+    while (true) {
+      std::cout << "Level: " << level << " frequency: " << frequency()
+                << " IPM: " << ipm() << " direction: " << direction
+                << std::endl;
 
+      // Update display.
+      buffer.Clear();
+      draw_speed(ipm(), "in", 0);
+      draw_speed(25.4 * ipm(), "mm", 24);
+      draw_arrow();
+      draw_labels();
       oled.Update();
+
       co_await update_event;
     }
   }
