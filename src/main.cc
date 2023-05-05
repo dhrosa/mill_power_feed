@@ -4,13 +4,13 @@
 #include <pico/async_context_poll.h>
 #include <pico/stdlib.h>
 
-#include <array>
 #include <cmath>
 #include <cstdio>
+#include <iomanip>
 #include <iostream>
 #include <span>
+#include <sstream>
 #include <string>
-#include <tuple>
 #include <vector>
 
 #include "button.h"
@@ -53,7 +53,8 @@ struct Controller {
         speed_control(133'000'000, 1, 0),
         update_event(context) {
     const double initial_ipm = 1;
-    level = fine_steps_per_octave * std::log2(ppi * initial_ipm / 60);
+    level =
+        std::round(fine_steps_per_octave * std::log2(ppi * initial_ipm / 60));
 
     Startup();
     CreateTasks();
@@ -100,7 +101,7 @@ struct Controller {
   const std::int64_t tpi = 20;
   const std::int64_t ppi = ppr * tpi;
   static constexpr std::int64_t fine_steps_per_octave = 160;
-  static constexpr std::int64_t coarse_multiplier = 4;
+  static constexpr std::int64_t coarse_multiplier = 8;
 
   Task EncoderTask(RotaryEncoder& encoder, std::int64_t multiplier) {
     std::int64_t previous = 0;
@@ -126,10 +127,40 @@ struct Controller {
   }
 
   Task UpdateTask() {
+    auto draw_speed = [&](double value, std::string_view unit, int x, int y) {
+      const auto f = &FontForHeight;
+      std::ostringstream ss;
+      // Always shows 5 characters including the decimal marker.
+      if (value > 1000) {
+        ss << int(value) << ".";
+      } else if (value > 1) {
+        ss << std::setprecision(4) << value;
+      } else {
+        ss << std::setprecision(3) << value;
+      }
+
+      const std::string_view value_str = ss.view();
+      buffer.DrawString(f(24), value_str, x, y);
+      x += value_str.size() * 12;
+      // unit-per-minute fraction drawn so that it takes up 1 digit height
+      // vertically, 2 digit widths horizontally, and lining up with the top
+      // and bottom edges of the digit text.
+      buffer.DrawString(f(8), unit, x + 7, y + 3);
+      buffer.DrawLineH(y + 11, x + 4, x + 20);
+      buffer.DrawString(f(8), "min", x + 5, y + 12);
+    };
+
     while (true) {
       std::cout << "Level: " << level << " frequency: " << frequency()
                 << " IPM: " << ipm() << " direction: " << direction
                 << std::endl;
+
+      buffer.Clear();
+
+      draw_speed(ipm(), "in", 0, 0);
+      draw_speed(25.4 * ipm(), "mm", 0, 24);
+
+      oled.Update();
       co_await update_event;
     }
   }

@@ -37,7 +37,9 @@ void OledBuffer::DrawChar(const Font& font, char letter, std::size_t x0,
   const std::size_t height = y1 - y0;
   for (std::size_t dx = 0; dx < width; ++dx) {
     for (std::size_t dy = 0; dy < height; ++dy) {
-      (*this)(x0 + dx, y0 + dy) = bool(font_data(dx, dy));
+      if (font_data(dx, dy)) {
+        (*this)(x0 + dx, y0 + dy) = 1;
+      }
     }
   }
 }
@@ -47,6 +49,12 @@ void OledBuffer::DrawString(const Font& font, std::string_view text,
   for (char letter : text) {
     DrawChar(font, letter, x0, y0);
     x0 += font.width;
+  }
+}
+
+void OledBuffer::DrawLineH(std::size_t y, std::size_t x0, std::size_t x1) {
+  for (std::size_t x = x0; x < x1; ++x) {
+    (*this)(x, y) = true;
   }
 }
 

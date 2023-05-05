@@ -32,6 +32,8 @@ class OledBuffer {
   void DrawString(const Font& font, std::string_view text, std::size_t x0,
                   std::size_t y0);
 
+  void DrawLineH(std::size_t y, std::size_t x0, std::size_t x1);
+
   // Allows read/write access to individual bits of the image as if they were
   // boolean values.
   class Pixel {
