@@ -189,7 +189,7 @@ struct Controller {
       std::cout << "Level: " << level << " frequency: " << frequency()
                 << " IPM: " << ipm() << " direction: " << direction
                 << std::endl;
-
+      speed_control.Set(direction * frequency());
       // Update display.
       buffer.Clear();
       draw_speed(ipm(), "in", 0);
