@@ -1,7 +1,9 @@
 import pandas as pd
 from pandas import DataFrame, Series
 from binascii import unhexlify
-
+from dataclasses import dataclass
+import struct
+import crc
 
 def keep_field(proto_name, name):
     parts = name.split(".")
@@ -82,7 +84,70 @@ def bulk_packets():
     df["data16"] = (df.data * 256) + data16_lsb
     return df.reset_index(drop=True)
 
+def transfers(df):
+    s = df.groupby(['host', 'request_number']).data.agg(Series.tolist)
+    return pd.concat(dict(host=s[True], device=s[False]), axis=1)
 
-pd.set_option("display.max_rows", 0)
-df = bulk_packets()
-print(df)
+class ChecksumError(ValueError):
+    pass
+
+
+def extract_payload(data):
+    payload = bytes(data[:-2])
+    checksum = int.from_bytes(data[-2:], byteorder='little')
+    expected_checksum = crc.Calculator(crc.Crc16.MODBUS).checksum(payload)
+    if checksum != expected_checksum:
+        raise ChecksumError(f'{checksum=:04X} vs {expected_checksum=:04X}')
+    return payload
+
+def check_eq(label, expected, actual):
+    if expected != actual:
+        raise ValueError('f{label} {expected=} {actual=}')
+
+@dataclass
+class ReadRequest:
+    address: int
+    offset: int
+    count: int
+
+    @staticmethod
+    def parse(values):
+        payload = extract_payload(values)
+        address, function, offset, count = struct.unpack('>BBHH', payload)
+        check_eq('function', function, 3)
+        return ReadRequest(address, offset, count)
+
+@dataclass
+class ReadResponse:
+    address: int
+    values: list[int]
+
+    @staticmethod
+    def parse(data):
+        payload = extract_payload(data)
+        address, function, expected_count = struct.unpack_from('>3B', payload)
+        payload = payload[3:]
+        check_eq('function', function, 3)
+        check_eq('value count', expected_count, len(payload))
+        values = memoryview(payload).cast('H')
+        return ReadResponse(address, list(values))
+
+def main():
+    import argparse
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input_pdml', type=Path, help="Path to Wireshark USB capture PDML file.")
+
+    args = parser.parse_args()
+
+    pd.set_option("display.max_rows", 0)
+    df = bulk_packets().pipe(transfers)
+    df.host = df.host.map(ReadRequest.parse)
+    df.device = df.device.map(ReadResponse.parse)
+
+    print(df)
+
+
+if __name__ == '__main__':
+    main()
