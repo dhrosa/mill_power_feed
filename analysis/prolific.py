@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import struct
 import crc
 
+
 def keep_field(proto_name, name):
     parts = name.split(".")
     if proto_name == "fake-field-wrapper" and parts[1] == "capdata":
@@ -44,10 +45,10 @@ def packet_to_record(packet):
     return columns
 
 
-def bulk_packets():
+def bulk_packets(pdml_path):
     from lxml import etree
 
-    root = etree.parse("prolific.pdml").getroot()
+    root = etree.parse(pdml_path).getroot()
     df = DataFrame.from_records(packet_to_record(p) for p in root)
 
     # Drop packets with no data.
@@ -84,9 +85,11 @@ def bulk_packets():
     df["data16"] = (df.data * 256) + data16_lsb
     return df.reset_index(drop=True)
 
+
 def transfers(df):
-    s = df.groupby(['host', 'request_number']).data.agg(Series.tolist)
+    s = df.groupby(["host", "request_number"]).data.agg(Series.tolist)
     return pd.concat(dict(host=s[True], device=s[False]), axis=1)
+
 
 class ChecksumError(ValueError):
     pass
@@ -94,15 +97,17 @@ class ChecksumError(ValueError):
 
 def extract_payload(data):
     payload = bytes(data[:-2])
-    checksum = int.from_bytes(data[-2:], byteorder='little')
+    checksum = int.from_bytes(data[-2:], byteorder="little")
     expected_checksum = crc.Calculator(crc.Crc16.MODBUS).checksum(payload)
     if checksum != expected_checksum:
-        raise ChecksumError(f'{checksum=:04X} vs {expected_checksum=:04X}')
+        raise ChecksumError(f"{checksum=:04X} vs {expected_checksum=:04X}")
     return payload
+
 
 def check_eq(label, expected, actual):
     if expected != actual:
-        raise ValueError('f{label} {expected=} {actual=}')
+        raise ValueError("f{label} {expected=} {actual=}")
+
 
 @dataclass
 class ReadRequest:
@@ -113,9 +118,42 @@ class ReadRequest:
     @staticmethod
     def parse(values):
         payload = extract_payload(values)
-        address, function, offset, count = struct.unpack('>BBHH', payload)
-        check_eq('function', function, 3)
+        address, function, offset, count = struct.unpack(">BBHH", payload)
+        check_eq("function", function, 3)
         return ReadRequest(address, offset, count)
+
+
+@dataclass
+class WriteSingleRequest:
+    address: int
+    offset: int
+    value: int
+
+    @staticmethod
+    def parse(data):
+        payload = extract_payload(data)
+        address, function, offset, value = struct.unpack(">BBHH", payload)
+        check_eq("function", function, 6)
+        return WriteSingleRequest(address, offset, value)
+
+
+def parse_request(data):
+    function = data[1]
+    if function == 3:
+        return ReadRequest.parse(data)
+    if function == 6:
+        return WriteSingleRequest.parse(data)
+    return data
+
+
+def parse_response(data):
+    function = data[1]
+    if function == 3:
+        return ReadResponse.parse(data)
+    if function == 6:
+        return WriteSingleRequest.parse(data)
+    return data
+
 
 @dataclass
 class ReadResponse:
@@ -125,29 +163,34 @@ class ReadResponse:
     @staticmethod
     def parse(data):
         payload = extract_payload(data)
-        address, function, expected_count = struct.unpack_from('>3B', payload)
+        address, function, expected_count = struct.unpack_from(">3B", payload)
         payload = payload[3:]
-        check_eq('function', function, 3)
-        check_eq('value count', expected_count, len(payload))
-        values = memoryview(payload).cast('H')
+        check_eq("function", function, 3)
+        check_eq("value count", expected_count, len(payload))
+        values = memoryview(payload).cast("H")
         return ReadResponse(address, list(values))
+
 
 def main():
     import argparse
     from pathlib import Path
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('input_pdml', type=Path, help="Path to Wireshark USB capture PDML file.")
+    parser.add_argument(
+        "input_pdml", type=Path, help="Path to Wireshark USB capture PDML file."
+    )
 
     args = parser.parse_args()
 
     pd.set_option("display.max_rows", 0)
-    df = bulk_packets().pipe(transfers)
-    df.host = df.host.map(ReadRequest.parse)
-    df.device = df.device.map(ReadResponse.parse)
+    pd.set_option("display.max_columns", 0)
+    pd.set_option("display.max_colwidth", None)
+    df = bulk_packets(args.input_pdml).pipe(transfers)
+    df.host = df.host.map(parse_request)
+    df.device = df.device.map(parse_response)
 
     print(df)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
