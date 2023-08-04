@@ -257,6 +257,7 @@ table = [
     0x4040,
 ]
 
+
 def checksum(data):
     value = 0xFFFF
     for b in data:
