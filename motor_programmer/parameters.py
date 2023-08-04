@@ -26,6 +26,7 @@ class Parameters:
         return 304
 
     def __getitem__(self, key):
+        self._check_key(key)
         read_command = struct.pack(
             ">BBHH",
             # Address
@@ -43,6 +44,7 @@ class Parameters:
         return value
 
     def __setitem__(self, key, value):
+        self._check_key(key)
         write_command = struct.pack(
             ">BBHH",
             # Address
@@ -60,6 +62,14 @@ class Parameters:
             raise ValueError(
                 f"Expected response: {list(write_command)} Actual response: {list(write_response)}"
             )
+
+    def _check_key(self, key):
+        if int(key) != key:
+            raise TypeError(f"Non-integer key: {key}")
+        key = int(key)
+        if key >= 0 and key < len(self):
+            return
+        raise IndexError(f"Key ({key}) outside of range [0, {len(self)})")
 
     def _send(self, data):
         data = data + crc.checksum(data).to_bytes(2, "little")
