@@ -1,7 +1,5 @@
 import crc
 import struct
-from busio import UART
-import microcontroller
 from page import Page
 
 
@@ -14,15 +12,8 @@ class MessageLengthError(ValueError):
 
 
 class Parameters:
-    def __init__(self):
-        # Pinout:
-        # https://cdn-learn.adafruit.com/assets/assets/000/104/022/original/adafruit_products_Adafruit_MacroPad_RP2040_Pinout.png?1629726427
-        self._uart = UART(
-            tx=microcontroller.pin.GPIO20,
-            rx=microcontroller.pin.GPIO21,
-            baudrate=38_400,
-        )
-
+    def __init__(self, uart):
+        self._uart = uart
         boundaries = (0, 65, 95, 125, 175, 215, len(self))
         self.pages = []
         for i in range(len(boundaries) - 1):
@@ -77,7 +68,7 @@ class Parameters:
         return int(key) % len(self)
 
     def _send(self, data):
-        data = data + crc.checksum(data).to_bytes(2, "little")
+        data = data + crc.checksum_bytes(data)
         self._uart.write(data)
 
     def _recv(self, format):
@@ -91,9 +82,11 @@ class Parameters:
             )
 
         payload = data[:-2]
-        expected_checksum = tuple(data[-2:])
-        actual_checksum = tuple(crc.checksum(payload).to_bytes(2, "little"))
+        expected_checksum = data[-2:]
+        actual_checksum = crc.checksum_bytes(payload)
         if actual_checksum != expected_checksum:
-            raise ChecksumError(f"{expected_checksum=} {actual_checksum=}")
+            raise ChecksumError(
+                f"{expected_checksum=} {actual_checksum=} data={list(data)}"
+            )
 
         return struct.unpack(format, payload)

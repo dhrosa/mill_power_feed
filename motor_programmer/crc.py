@@ -265,3 +265,7 @@ def checksum(data):
         value >>= 8
         value ^= table[table_index]
     return value
+
+
+def checksum_bytes(data):
+    return checksum(data).to_bytes(2, "little")
