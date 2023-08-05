@@ -14,19 +14,26 @@ class MessageLengthError(ValueError):
 class Parameters:
     def __init__(self, uart):
         self._uart = uart
+        self._cache = {}
         boundaries = (0, 65, 95, 125, 175, 215, len(self))
-        self.pages = []
+        self._pages = []
         for i in range(len(boundaries) - 1):
             number = i + 1
             start = boundaries[i]
             stop = boundaries[i + 1] - 1
-            self.pages.append(Page(self, number, start, stop))
+            self._pages.append(Page(self, number, start, stop))
+
+    @property
+    def pages(self):
+        return self._pages
 
     def __len__(self):
         return 304
 
     def __getitem__(self, key):
         key = self._check_key(key)
+        if key in self._cache:
+            return self._cache[key]
         read_command = struct.pack(
             ">BBHH",
             # Address
@@ -40,10 +47,12 @@ class Parameters:
         )
         self._send(read_command)
         address, function, byte_count, value = self._recv(">BBBH")
+        self._cache[key] = value
         return value
 
     def __setitem__(self, key, value):
         key = self._check_key(key)
+        del self._cache[key]
         write_command = struct.pack(
             ">BBHH",
             # Address
