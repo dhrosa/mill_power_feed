@@ -2,6 +2,7 @@ import crc
 import struct
 from busio import UART
 import microcontroller
+from page import Page
 
 
 class ChecksumError(ValueError):
@@ -22,11 +23,19 @@ class Parameters:
             baudrate=38_400,
         )
 
+        boundaries = (0, 65, 95, 125, 175, 215, len(self))
+        self.pages = []
+        for i in range(len(boundaries) - 1):
+            number = i + 1
+            start = boundaries[i]
+            stop = boundaries[i + 1] - 1
+            self.pages.append(Page(self, number, start, stop))
+
     def __len__(self):
         return 304
 
     def __getitem__(self, key):
-        self._check_key(key)
+        key = self._check_key(key)
         read_command = struct.pack(
             ">BBHH",
             # Address
@@ -40,11 +49,10 @@ class Parameters:
         )
         self._send(read_command)
         address, function, byte_count, value = self._recv(">BBBH")
-        print("Response: ", (address, function, byte_count, value))
         return value
 
     def __setitem__(self, key, value):
-        self._check_key(key)
+        key = self._check_key(key)
         write_command = struct.pack(
             ">BBHH",
             # Address
@@ -66,14 +74,10 @@ class Parameters:
     def _check_key(self, key):
         if int(key) != key:
             raise TypeError(f"Non-integer key: {key}")
-        key = int(key)
-        if key >= 0 and key < len(self):
-            return
-        raise IndexError(f"Key ({key}) outside of range [0, {len(self)})")
+        return int(key) % len(self)
 
     def _send(self, data):
         data = data + crc.checksum(data).to_bytes(2, "little")
-        print("Sending: ", list(data))
         self._uart.write(data)
 
     def _recv(self, format):
@@ -85,7 +89,6 @@ class Parameters:
             raise MessageLengthError(
                 f"{expected_size=} {actual_size=} data={list(data)}"
             )
-        print("Received: ", list(data))
 
         payload = data[:-2]
         expected_checksum = tuple(data[-2:])
