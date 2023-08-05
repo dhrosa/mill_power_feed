@@ -15,13 +15,11 @@ class Parameters:
     def __init__(self, uart):
         self._uart = uart
         self._cache = {}
-        boundaries = (0, 65, 95, 125, 175, 215, len(self))
+        starts = (0, 25, 65, 95, 125, 175, 215, 255)
+        lengths = (20, 38, 24, 25, 48, 36, 34, 17)
         self._pages = []
-        for i in range(len(boundaries) - 1):
-            number = i + 1
-            start = boundaries[i]
-            stop = boundaries[i + 1] - 1
-            self._pages.append(Page(self, number, start, stop))
+        for i, (start, length) in enumerate(zip(starts, lengths)):
+            self._pages.append(Page(self, i, start, start + length))
 
     @property
     def pages(self):

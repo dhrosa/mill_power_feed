@@ -14,8 +14,11 @@ class Page:
     def __len__(self):
         return self.stop - self.start
 
-    def __getitem__(self, key):
-        return self.params[self.start + (key % len(self))]
+    def __getitem__(self, offset):
+        return self.params[self.absolute_key(offset)]
 
-    def __setitem__(self, key, value):
-        self.params[self.start + (key % len(self))] = value
+    def __setitem__(self, offset, value):
+        self.params[self.start + self.absolute_key(offset)] = value
+
+    def absolute_key(self, key):
+        return self.start + (key % len(self))
