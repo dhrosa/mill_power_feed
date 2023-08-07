@@ -27,21 +27,17 @@ class Ui:
         self._text[1].text = f"Value: {page[self._offset]:6d}"
         self._text.show()
 
-    def advance_page(self, delta):
-        if delta == 0:
-            return
-        self._offset = 0
-        self._page_index += delta
-        self._page_index %= len(self._params.pages)
+    def advance(self, page_delta=0, offset_delta=0):
+        if offset_delta:
+            assert not page_delta
+            self._offset += offset_delta
+            self._offset %= len(self.page)
+        if page_delta:
+            assert not offset_delta
+            self._offset = 0
+            self._page_index += page_delta
+            self._page_index %= len(self._params.pages)
         self.render()
-
-    def advance_offset(self, delta):
-        if delta == 0:
-            return
-        self._offset += delta
-        self._offset %= len(self.page)
-        self.render()
-
 
 # Pinout:
 # https://cdn-learn.adafruit.com/assets/assets/000/104/022/original/adafruit_products_Adafruit_MacroPad_RP2040_Pinout.png?1629726427
@@ -68,10 +64,10 @@ while True:
     if not event.pressed:
         continue
     if key_number == 3:
-        ui.advance_page(-1)
+        ui.advance(page_delta=-1)
     if key_number == 5:
-        ui.advance_page(+1)
+        ui.advance(page_delta=+1)
     if key_number == 6:
-        ui.advance_offset(-1)
+        ui.advance(offset_delta=-1)
     if key_number == 8:
-        ui.advance_offset(+1)
+        ui.advance(offset_delta=+1)
