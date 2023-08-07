@@ -1,15 +1,83 @@
-import displayio
+from displayio import Group
 from adafruit_display_text import label, bitmap_label
 import terminalio
 
+font = terminalio.FONT
+
 
 def make_label(*args, **kwargs):
-    kwargs.update({"font": terminalio.FONT})
+    kwargs.update({"font": font})
     return label.Label(*args, **kwargs)
 
 
 def translate(pos, delta):
     return (pos[0] + delta[0], pos[1] + delta[1])
+
+
+class Digit(label.Label):
+    def __init__(self):
+        super().__init__(font=font)
+        self.value = None
+        self.selected = False
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, new_value):
+        self._value = new_value
+        if new_value is None:
+            self.text = ""
+        else:
+            self.text = str(new_value)
+
+    @property
+    def selected(self):
+        return self._selected
+
+    @selected.setter
+    def selected(self, new_selected):
+        self._selected = new_selected
+        black = 0
+        white = 0xFF_FF_FF
+        if new_selected:
+            self.color = black
+            self.background_color = white
+        else:
+            self.color = white
+            self.background_color = black
+
+
+class ValueEditor(Group):
+    def __init__(self):
+        super().__init__()
+        self._selected_index = 5
+        x = 0
+        y = 0
+        for i in reversed(range(6)):
+            digit = Digit()
+            digit.value = i
+            digit.anchor_point = (0, 0)
+            digit.anchored_position = (x, y)
+            x += digit.width
+            self.append(digit)
+        self.value = 123
+
+    @property
+    def value(self):
+        return int("".join(d.text for d in self))
+
+    @value.setter
+    def value(self, new_value):
+        value_str = f"{new_value:6d}"
+        for i, digit_str in enumerate(value_str):
+            if digit_str == " ":
+                digit_value = None
+            else:
+                digit_value = int(digit_str)
+            self[i].value = digit_value
+        self[5].selected = True
 
 
 class Ui:
@@ -22,20 +90,20 @@ class Ui:
         width = macropad.display.width
         height = macropad.display.height
 
-        self._root = displayio.Group()
+        self._root = Group()
 
         title = make_label(text="Parameter Editor")
         self._root.append(title)
         title.anchor_point = (0.5, 0)
-        title.anchored_position = (width / 2, 0)
+        title.anchored_position = (width // 2, 0)
 
-        form = displayio.Group(y=title.anchored_position[1] + title.height)
+        form = Group(y=title.anchored_position[1] + title.height)
         self._root.append(form)
 
         key_label = make_label(text="Key: ")
         form.append(key_label)
         key_label.anchor_point = (1, 0)
-        key_label.anchored_position = (width / 2, 0)
+        key_label.anchored_position = (width // 2, 0)
 
         value_label = make_label(text="Value: ")
         form.append(value_label)
@@ -44,10 +112,17 @@ class Ui:
             key_label.anchored_position, (0, key_label.height)
         )
 
+        new_value_label = make_label(text="New Value: ")
+        form.append(new_value_label)
+        new_value_label.anchor_point = value_label.anchor_point
+        new_value_label.anchored_position = translate(
+            value_label.anchored_position, (0, value_label.height)
+        )
+
         key = make_label(text="<KEY>")
         form.append(key)
         key.anchor_point = (0, 0)
-        key.anchored_position = (width / 2, 0)
+        key.anchored_position = (width // 2, 0)
         self._key_text = key
 
         value = make_label(text="<VALUE>")
@@ -55,6 +130,12 @@ class Ui:
         value.anchor_point = (0, 0)
         value.anchored_position = translate(key.anchored_position, (0, key.height))
         self._value_text = value
+
+        new_value = ValueEditor()
+        form.append(new_value)
+        new_value.x = value.anchored_position[0]
+        new_value.y = value.anchored_position[1] + value.height
+        self._new_value_editor = new_value
 
         self._update_key_value_text()
 
@@ -66,9 +147,11 @@ class Ui:
         page = self.page
         key = self.page.absolute_key(self._offset)
         offset = self._offset
+        value = page[offset]
 
         self._key_text.text = f"{page.number}.{offset:02d} ({key:3d})"
-        self._value_text.text = f"{page[offset]:6d}"
+        self._value_text.text = f"{value:6d}"
+        self._new_value_editor.value = value
 
     def render(self):
         self._macropad.display.root_group = self._root
