@@ -52,13 +52,13 @@ class Ui:
             key_label.anchored_position, (0, key_label.height)
         )
 
-        key = make_label(text="Pr12.34")
+        key = make_label(text="<KEY>")
         form.append(key)
         key.anchor_point = (0, 0)
         key.anchored_position = (width / 2, 0)
         self._key_text = key
 
-        value = make_label(text="12345")
+        value = make_label(text="<VALUE>")
         form.append(value)
         value.anchor_point = (0, 0)
         value.anchored_position = translate(key.anchored_position, (0, key.height))
