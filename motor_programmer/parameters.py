@@ -12,8 +12,8 @@ class MessageLengthError(ValueError):
 
 
 class Parameters:
-    def __init__(self, uart):
-        self._uart = uart
+    def __init__(self, stream):
+        self._stream = stream
         self._cache = {}
         starts = (0, 25, 65, 95, 125, 175, 215, 255)
         lengths = (20, 38, 24, 25, 48, 36, 34, 17)
@@ -76,11 +76,11 @@ class Parameters:
 
     def _send(self, data):
         data = data + crc.checksum_bytes(data)
-        self._uart.write(data)
+        self._stream.write(data)
 
     def _recv(self, format):
         expected_size = struct.calcsize(format) + 2
-        data = self._uart.read(expected_size)
+        data = self._stream.read(expected_size)
         if data is None:
             raise MessageLengthError("No data; timeout?")
         if (actual_size := len(data)) != expected_size:

@@ -3,6 +3,7 @@ import time
 from busio import UART
 import microcontroller
 from parameters import Parameters
+from fake_stream import FakeStream
 
 print()
 
@@ -44,9 +45,11 @@ class Ui:
 
 # Pinout:
 # https://cdn-learn.adafruit.com/assets/assets/000/104/022/original/adafruit_products_Adafruit_MacroPad_RP2040_Pinout.png?1629726427
-params = Parameters(
-    UART(tx=microcontroller.pin.GPIO20, rx=microcontroller.pin.GPIO21, baudrate=38_400)
-)
+# modbus_stream = UART(tx=microcontroller.pin.GPIO20, rx=microcontroller.pin.GPIO21, baudrate=38_400)
+
+modbus_stream = FakeStream()
+params = Parameters(modbus_stream)
+
 
 macropad = MacroPad()
 text_lines = macropad.display_text(title="Parameter Editor")
