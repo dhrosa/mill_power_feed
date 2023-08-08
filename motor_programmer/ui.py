@@ -17,7 +17,7 @@ def translate(pos, delta):
 class Digit(label.Label):
     def __init__(self):
         super().__init__(font=font)
-        self.value = None
+        self.value = 0
         self.selected = False
 
     @property
@@ -27,10 +27,7 @@ class Digit(label.Label):
     @value.setter
     def value(self, new_value):
         self._value = new_value
-        if new_value is None:
-            self.text = ""
-        else:
-            self.text = str(new_value)
+        self.text = str(new_value)
 
     @property
     def selected(self):
@@ -72,12 +69,31 @@ class ValueEditor(Group):
     def value(self, new_value):
         value_str = f"{new_value:6d}"
         for i, digit_str in enumerate(value_str):
+            digit = self[i]
             if digit_str == " ":
-                digit_value = None
+                digit.value = 0
+                digit.hidden = True
             else:
-                digit_value = int(digit_str)
-            self[i].value = digit_value
+                digit.value = int(digit_str)
+                digit.hidden = False
         self[5].selected = True
+
+    @property
+    def selected_digit(self):
+        return self[self._selected_index]
+
+    def increment_digit(self, delta):
+        if delta == 0:
+            return
+        digit = self.selected_digit
+        digit.value = (digit.value + delta) % 10
+
+    def next_digit(self):
+        self.selected_digit.selected = False
+        self._selected_index -= 1
+        self._selected_index %= 6
+        self.selected_digit.selected = True
+        self.selected_digit.hidden = False
 
 
 class Ui:
@@ -168,3 +184,9 @@ class Ui:
             self._page_index %= len(self._params.pages)
         self._update_key_value_text()
         self.render()
+
+    def increment_digit(self, delta):
+        self._new_value_editor.increment_digit(delta)
+
+    def next_digit(self):
+        self._new_value_editor.next_digit()

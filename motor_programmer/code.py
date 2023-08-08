@@ -20,7 +20,17 @@ macropad = MacroPad()
 ui = Ui(params, macropad)
 ui.render()
 
+last_encoder_value = macropad.encoder
+
 while True:
+    macropad.encoder_switch_debounced.update()
+    encoder_value = macropad.encoder
+    if encoder_value != last_encoder_value:
+        ui.increment_digit(encoder_value - last_encoder_value)
+        last_encoder_value = encoder_value
+
+    if macropad.encoder_switch_debounced.pressed:
+        ui.next_digit()
     event = macropad.keys.events.get()
     if not event:
         continue
