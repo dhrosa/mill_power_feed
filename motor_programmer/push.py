@@ -56,7 +56,8 @@ def main():
         if source == this_file or source.name[0] == ".":
             # print(f'Skipping {source}')
             continue
-        dest = dest_dir / source.relative_to(source_dir)
+        rel_path = source.relative_to(source_dir)
+        dest = dest_dir / rel_path
         dest.parent.mkdir(parents=True, exist_ok=True)
         if dest.exists():
             # Round source timestamp to 2s resolution to match FAT drive.
@@ -64,7 +65,7 @@ def main():
             dest_mtime = dest.stat().st_mtime
             if source_mtime == dest_mtime:
                 continue
-        print(f"Copying {source}")
+        print(f"Copying {rel_path}")
         shutil.copy2(source, dest)
 
     print("Push completed.")
