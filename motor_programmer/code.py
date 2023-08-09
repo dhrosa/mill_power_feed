@@ -25,10 +25,10 @@ macropad.pixels.brightness = 0.5
 leds = [Led(macropad.pixels, i) for i in range(macropad.pixels.n)]
 
 for i in (3, 5):
-    leds[i]['base'] = (0, 32, 0)
+    leds[i]["base"] = (0, 32, 0)
 
 for i in (6, 8):
-    leds[i]['base'] = (0, 16, 16)
+    leds[i]["base"] = (0, 16, 16)
 
 last_encoder_value = macropad.encoder
 while True:
@@ -50,26 +50,26 @@ while True:
     if key_number == 3:
         if event.pressed:
             ui.advance(page_delta=-1)
-            leds[3]['press'] = (0, 255, 0)
+            leds[3]["press"] = (0, 255, 0)
         else:
-            del leds[3]['press']
+            del leds[3]["press"]
 
     if key_number == 5:
         if event.pressed:
             ui.advance(page_delta=+1)
-            leds[5]['press'] = (0, 255, 0)
+            leds[5]["press"] = (0, 255, 0)
         else:
-            del leds[5]['press']
+            del leds[5]["press"]
 
     if key_number == 6:
         if event.pressed:
             ui.advance(offset_delta=-1)
-            leds[6]['press'] = (0, 128, 128)
+            leds[6]["press"] = (0, 128, 128)
         else:
-            del leds[6]['press']
+            del leds[6]["press"]
     if key_number == 8:
         if event.pressed:
             ui.advance(offset_delta=+1)
-            leds[8]['press'] = (0, 128, 128)
+            leds[8]["press"] = (0, 128, 128)
         else:
-            del leds[8]['press']
+            del leds[8]["press"]

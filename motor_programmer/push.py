@@ -53,7 +53,7 @@ def main():
     dest_dir = Path(mountpoint)
 
     for source in this_file.parent.rglob("*"):
-        if source == this_file or source.name[0] == ".":
+        if source == this_file or source.name[0] == "." or source.is_dir():
             # print(f'Skipping {source}')
             continue
         rel_path = source.relative_to(source_dir)

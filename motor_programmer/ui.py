@@ -1,8 +1,25 @@
 from displayio import Group
 from adafruit_display_text import label, bitmap_label
 import terminalio
+import os
+from adafruit_bitmap_font import bitmap_font
 
-font = terminalio.FONT
+fonts_by_height = {}
+
+print()
+for fname in os.listdir("fonts"):
+    # TODO(dhrosa): Loading all of the fonts causes the board to OOM
+    if not fname.endswith("12.bdf"):
+        continue
+    print(fname)
+    path = f"fonts/{fname}"
+    font = bitmap_font.load_font(path)
+    font.load_glyphs(range(32, 127))
+    height = font.get_bounding_box()[1]
+    fonts_by_height[height] = font
+
+
+font = fonts_by_height[12]
 
 
 def make_label(*args, **kwargs):
