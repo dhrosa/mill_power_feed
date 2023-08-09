@@ -16,8 +16,6 @@ class Led:
             value = self._overlays[-1].value
         self._pixels[self._index] = value
 
-        print(self._overlays)
-
     def __getitem__(self, key):
         for overlay in self._overlays:
             if overlay.key == key:

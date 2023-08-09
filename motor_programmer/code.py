@@ -21,7 +21,14 @@ macropad = MacroPad()
 ui = Ui(params, macropad)
 ui.render()
 
+macropad.pixels.brightness = 0.5
 leds = [Led(macropad.pixels, i) for i in range(macropad.pixels.n)]
+
+for i in (3, 5):
+    leds[i]['base'] = (0, 32, 0)
+
+for i in (6, 8):
+    leds[i]['base'] = (0, 16, 16)
 
 last_encoder_value = macropad.encoder
 while True:
@@ -40,30 +47,29 @@ while True:
     key_number = event.key_number
     # macropad.pixels[key_number] = (255, 255, 255) if event.pressed else 0
 
-    if not event.pressed:
-        continue
-    print(key_number)
     if key_number == 3:
-        ui.advance(page_delta=-1)
+        if event.pressed:
+            ui.advance(page_delta=-1)
+            leds[3]['press'] = (0, 255, 0)
+        else:
+            del leds[3]['press']
+
     if key_number == 5:
-        ui.advance(page_delta=+1)
+        if event.pressed:
+            ui.advance(page_delta=+1)
+            leds[5]['press'] = (0, 255, 0)
+        else:
+            del leds[5]['press']
+
     if key_number == 6:
-        ui.advance(offset_delta=-1)
+        if event.pressed:
+            ui.advance(offset_delta=-1)
+            leds[6]['press'] = (0, 128, 128)
+        else:
+            del leds[6]['press']
     if key_number == 8:
-        ui.advance(offset_delta=+1)
-
-    if key_number == 9:
-        leds[0]["layer1"] = (255, 0, 0)
-
-    if key_number == 10:
-        leds[0]["layer2"] = (0, 255, 0)
-
-    if key_number == 11:
-        leds[0]["layer3"] = (0, 0, 255)
-
-    if key_number == 0:
-        del leds[0]["layer1"]
-    if key_number == 1:
-        del leds[0]["layer2"]
-    if key_number == 2:
-        del leds[0]["layer3"]
+        if event.pressed:
+            ui.advance(offset_delta=+1)
+            leds[8]['press'] = (0, 128, 128)
+        else:
+            del leds[8]['press']
