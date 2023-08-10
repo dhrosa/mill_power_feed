@@ -24,10 +24,35 @@ ui.render()
 macropad.pixels.brightness = 0.5
 leds = [Led(macropad.pixels, i) for i in range(macropad.pixels.n)]
 
-for i in (3, 5):
+
+def iterable_members(cls):
+    all = set()
+    for name, value in cls.__dict__.items():
+        if name.startswith('_'):
+            continue
+        if isinstance(value, type):
+            all |= value.all
+        else:
+            all.add(value)
+    cls.all = all
+    return cls
+
+@iterable_members
+class buttons:
+    @iterable_members
+    class page:
+        previous = 3
+        next = 5
+
+    @iterable_members
+    class parameter:
+        previous = 6
+        next = 8
+
+for i in buttons.page.all:
     leds[i]["base"] = (0, 32, 0)
 
-for i in (6, 8):
+for i in buttons.parameter.all:
     leds[i]["base"] = (0, 16, 16)
 
 last_encoder_value = macropad.encoder
