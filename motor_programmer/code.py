@@ -23,7 +23,7 @@ macropad = MacroPad()
 ui = Ui(params, macropad)
 ui.render()
 
-macropad.pixels.brightness = 0.5
+macropad.pixels.brightness = 1
 leds = [Led(macropad.pixels, i) for i in range(macropad.pixels.n)]
 
 
@@ -69,7 +69,7 @@ for i in buttons.parameter.all:
 leds[buttons.cancel]["base"] = hls(0, 0.25, 0.75)
 pressed_colors[buttons.cancel] = hls(0, 0.5, 1)
 
-leds[buttons.confirm]["base"] = hls(1 / 3, 0.5, 0.75)
+leds[buttons.confirm]["base"] = hls(1 / 3, 0.25, 0.75)
 pressed_colors[buttons.confirm] = hls(1 / 3, 0.5, 1)
 
 last_encoder_value = macropad.encoder
