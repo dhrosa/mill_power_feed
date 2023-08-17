@@ -52,8 +52,13 @@ class buttons:
         previous = 6
         next = 8
 
-    cancel = 9
-    confirm = 11
+    @iterable_members
+    class confirm:
+        a = 9
+        b = 10
+        c = 11
+
+    cancel = 0
 
 
 pressed_colors = [0] * len(leds)
@@ -69,10 +74,13 @@ for i in buttons.parameter.all:
 leds[buttons.cancel]["base"] = hls(0, 0.25, 0.75)
 pressed_colors[buttons.cancel] = hls(0, 0.5, 1)
 
-leds[buttons.confirm]["base"] = hls(1 / 3, 0.25, 0.75)
-pressed_colors[buttons.confirm] = hls(1 / 3, 0.5, 1)
+for i in buttons.confirm.all:
+    leds[i]["base"] = hls(1 / 3, 0.25, 0.75)
+    pressed_colors[i] = hls(1 / 3, 0.5, 1)
 
 last_encoder_value = macropad.encoder
+confirm_pressed = set()
+
 while True:
     macropad.encoder_switch_debounced.update()
     encoder_value = macropad.encoder
@@ -91,6 +99,7 @@ while True:
 
     if event.released:
         del led["press"]
+        confirm_pressed.discard(button)
         continue
 
     led["press"] = pressed_colors[button]
@@ -105,5 +114,8 @@ while True:
         ui.advance(offset_delta=+1)
     if button == buttons.cancel:
         ui.cancel()
-    if button == buttons.confirm:
-        ui.confirm()
+    if button in buttons.confirm.all:
+        confirm_pressed.add(button)
+        if confirm_pressed == buttons.confirm.all:
+            confirm_pressed.clear()
+            ui.confirm()
