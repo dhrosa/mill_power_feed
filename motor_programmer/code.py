@@ -5,6 +5,7 @@ from parameters import Parameters
 from fake_stream import FakeStream
 from ui import Ui
 from led import Led
+from colorsys import hls_to_rgb as hls
 
 
 print("\nStartup")
@@ -29,7 +30,7 @@ leds = [Led(macropad.pixels, i) for i in range(macropad.pixels.n)]
 def iterable_members(cls):
     all = set()
     for name, value in cls.__dict__.items():
-        if name.startswith('_'):
+        if name.startswith("_"):
             continue
         if isinstance(value, type):
             all |= value.all
@@ -37,6 +38,7 @@ def iterable_members(cls):
             all.add(value)
     cls.all = all
     return cls
+
 
 @iterable_members
 class buttons:
@@ -50,11 +52,25 @@ class buttons:
         previous = 6
         next = 8
 
+    cancel = 9
+    confirm = 11
+
+
+pressed_colors = [0] * len(leds)
+
 for i in buttons.page.all:
-    leds[i]["base"] = (0, 32, 0)
+    leds[i]["base"] = hls(5 / 6, 0.25, 0.75)
+    pressed_colors[i] = hls(5 / 6, 0.5, 1)
 
 for i in buttons.parameter.all:
-    leds[i]["base"] = (0, 16, 16)
+    leds[i]["base"] = hls(4 / 6, 0.25, 0.75)
+    pressed_colors[i] = hls(4 / 6, 0.5, 1)
+
+leds[buttons.cancel]["base"] = hls(0, 0.25, 0.75)
+pressed_colors[buttons.cancel] = hls(0, 0.5, 1)
+
+leds[buttons.confirm]["base"] = hls(1 / 3, 0.5, 0.75)
+pressed_colors[buttons.confirm] = hls(1 / 3, 0.5, 1)
 
 last_encoder_value = macropad.encoder
 while True:
@@ -70,32 +86,24 @@ while True:
     if not event:
         continue
 
-    key_number = event.key_number
-    # macropad.pixels[key_number] = (255, 255, 255) if event.pressed else 0
+    button = event.key_number
+    led = leds[button]
 
-    if key_number == 3:
-        if event.pressed:
-            ui.advance(page_delta=-1)
-            leds[3]["press"] = (0, 255, 0)
-        else:
-            del leds[3]["press"]
+    if event.released:
+        del led["press"]
+        continue
 
-    if key_number == 5:
-        if event.pressed:
-            ui.advance(page_delta=+1)
-            leds[5]["press"] = (0, 255, 0)
-        else:
-            del leds[5]["press"]
+    led["press"] = pressed_colors[button]
 
-    if key_number == 6:
-        if event.pressed:
-            ui.advance(offset_delta=-1)
-            leds[6]["press"] = (0, 128, 128)
-        else:
-            del leds[6]["press"]
-    if key_number == 8:
-        if event.pressed:
-            ui.advance(offset_delta=+1)
-            leds[8]["press"] = (0, 128, 128)
-        else:
-            del leds[8]["press"]
+    if button == buttons.page.previous:
+        ui.advance(page_delta=-1)
+    if button == buttons.page.next:
+        ui.advance(page_delta=+1)
+    if button == buttons.parameter.previous:
+        ui.advance(offset_delta=-1)
+    if button == buttons.parameter.next:
+        ui.advance(offset_delta=+1)
+    if button == buttons.cancel:
+        ui.cancel()
+    if button == buttons.confirm:
+        ui.confirm()

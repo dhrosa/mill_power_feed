@@ -8,6 +8,7 @@ from font_loader import load_fonts
 fonts = load_fonts()
 font = fonts[12]
 
+
 def make_label(*args, **kwargs):
     kwargs.update({"font": font})
     return label.Label(*args, **kwargs)
@@ -156,15 +157,19 @@ class Ui:
         new_value.y = value.anchored_position[1] + value.height
         self._new_value_editor = new_value
 
-        self._update_key_value_text()
+        self._reset_key_value_text()
 
     @property
     def page(self):
         return self._params.pages[self._page_index]
 
-    def _update_key_value_text(self):
+    @property
+    def absolute_key(self):
+        return self.page.absolute_key(self._offset)
+
+    def _reset_key_value_text(self):
         page = self.page
-        key = self.page.absolute_key(self._offset)
+        key = self.absolute_key
         offset = self._offset
         value = page[offset]
 
@@ -185,7 +190,7 @@ class Ui:
             self._offset = 0
             self._page_index += page_delta
             self._page_index %= len(self._params.pages)
-        self._update_key_value_text()
+        self._reset_key_value_text()
         self.render()
 
     def increment_digit(self, delta):
@@ -193,3 +198,13 @@ class Ui:
 
     def next_digit(self):
         self._new_value_editor.next_digit()
+
+    def cancel(self):
+        self._reset_key_value_text()
+
+    def confirm(self):
+        key = self.absolute_key
+        value = self._new_value_editor.value
+        print(f"Writing {key=} {value=}")
+        self._params[key] = value
+        self._reset_key_value_text()

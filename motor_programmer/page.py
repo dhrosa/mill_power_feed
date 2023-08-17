@@ -18,7 +18,7 @@ class Page:
         return self.params[self.absolute_key(offset)]
 
     def __setitem__(self, offset, value):
-        self.params[self.start + self.absolute_key(offset)] = value
+        self.params[self.absolute_key(offset)] = value
 
     def absolute_key(self, key):
         return self.start + (key % len(self))
