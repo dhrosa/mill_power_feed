@@ -64,8 +64,8 @@ class buttons:
 pressed_colors = [0] * len(leds)
 
 for i in buttons.page.all:
-    leds[i]["base"] = hls(5 / 6, 0.25, 0.75)
-    pressed_colors[i] = hls(5 / 6, 0.5, 1)
+    leds[i]["base"] = hls(1/ 2, 0.25, 0.75)
+    pressed_colors[i] = hls(1 / 2, 0.5, 1)
 
 for i in buttons.parameter.all:
     leds[i]["base"] = hls(4 / 6, 0.25, 0.75)
