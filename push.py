@@ -75,6 +75,7 @@ def mount(device_path):
 
 def main():
     parser = ArgumentParser()
+    parser.add_argument("source_dir", type=Path)
     parser.add_argument("--vendor", type=str, default="")
     parser.add_argument("--model", type=str, default="")
     parser.add_argument("--serial", type=str, default="")
@@ -95,12 +96,11 @@ def main():
     if not child.mountpoint:
         exit("CIRCUITPY drive not mounted somehow.")
 
-    this_file = Path(__file__)
-    source_dir = this_file.parent
+    source_dir = args.source_dir
     dest_dir = Path(child.mountpoint)
 
-    for source in this_file.parent.rglob("*"):
-        if source == this_file or source.name[0] == "." or source.is_dir():
+    for source in source_dir.rglob("*"):
+        if source.name[0] == "." or source.is_dir():
             # print(f'Skipping {source}')
             continue
         rel_path = source.relative_to(source_dir)
