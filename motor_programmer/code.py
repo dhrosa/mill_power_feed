@@ -1,22 +1,16 @@
 from adafruit_macropad import MacroPad
-from busio import UART
 import microcontroller
 from parameters import Parameters
-from fake_stream import FakeStream
 from ui import Ui
 from led import Led
 from colorsys import hls_to_rgb as hls
+from fake_bridge import FakeBridge
 
 
 print("\nStartup")
 
-# Pinout:
-# https://cdn-learn.adafruit.com/assets/assets/000/104/022/original/adafruit_products_Adafruit_MacroPad_RP2040_Pinout.png?1629726427
-# modbus_stream = UART(tx=microcontroller.pin.GPIO20, rx=microcontroller.pin.GPIO21, baudrate=38_400)
-
-modbus_stream = FakeStream()
-params = Parameters(modbus_stream)
-
+modbus_bridge = FakeBridge()
+params = Parameters(modbus_bridge)
 
 macropad = MacroPad()
 
