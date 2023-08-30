@@ -1,4 +1,5 @@
 import struct
+import crc
 
 
 class ChecksumError(ValueError):
@@ -54,7 +55,7 @@ class Modbus:
         address, function, byte_count, value = self._recv(">BBBH")
         return value
 
-    def set(self, key):
+    def set(self, key, value):
         write_command = struct.pack(
             ">BBHH",
             # Address

@@ -3,7 +3,6 @@ from page import Page
 class Parameters:
     def __init__(self, bridge_device):
         self._device = bridge_device
-        self._cache = {}
         starts = (0, 25, 65, 95, 125, 175, 215, 255)
         lengths = (20, 38, 24, 25, 48, 36, 34, 17)
         self._pages = []
@@ -19,16 +18,11 @@ class Parameters:
 
     def __getitem__(self, key):
         key = self._check_key(key)
-        if key in self._cache:
-            return self._cache[key]
-        value = self._device[key]
-        self._cache[key] = value
-        return value
+        return self._device[key]
 
     def __setitem__(self, key, value):
         key = self._check_key(key)
         self._device[key] = value
-        self._cache[key] = value
 
 
     def _check_key(self, key):

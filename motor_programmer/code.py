@@ -4,12 +4,13 @@ from parameters import Parameters
 from ui import Ui
 from led import Led
 from colorsys import hls_to_rgb as hls
-from fake_bridge import FakeBridge
+from i2c_bridge import I2cBridge
+import board
 
 
 print("\nStartup")
 
-modbus_bridge = FakeBridge()
+modbus_bridge = I2cBridge(board.I2C())
 params = Parameters(modbus_bridge)
 
 macropad = MacroPad()
