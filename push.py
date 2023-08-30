@@ -69,7 +69,7 @@ class Filter:
 
 
 def mount(device_path):
-    mount_stdout = run(f"udisksctl mount --block-device {device_path}".split())
+    mount_stdout = run(f"udisksctl mount --block-device {device_path} --options noatime".split())
     print(f"udisksctl: {mount_stdout}")
 
 
