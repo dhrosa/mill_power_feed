@@ -73,9 +73,27 @@ def mount(device_path):
     print(f"udisksctl: {mount_stdout}")
 
 
+def push_tree(source_dir, dest_dir):
+    for source in source_dir.rglob("*"):
+        if source.name[0] == "." or source.is_dir():
+            # print(f'Skipping {source}')
+            continue
+        rel_path = source.relative_to(source_dir)
+        dest = dest_dir / rel_path
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if dest.exists():
+            # Round source timestamp to 2s resolution to match FAT drive.
+            source_mtime = (source.stat().st_mtime // 2) * 2
+            dest_mtime = dest.stat().st_mtime
+            if source_mtime == dest_mtime:
+                continue
+        print(f"Copying {rel_path}")
+        shutil.copy2(source, dest)
+
+
 def main():
     parser = ArgumentParser()
-    parser.add_argument("source_dir", type=Path)
+    parser.add_argument("source_dir", type=Path, nargs='+')
     parser.add_argument("--vendor", type=str, default="")
     parser.add_argument("--model", type=str, default="")
     parser.add_argument("--serial", type=str, default="")
@@ -96,25 +114,10 @@ def main():
     if not child.mountpoint:
         exit("CIRCUITPY drive not mounted somehow.")
 
-    source_dir = args.source_dir
     dest_dir = Path(child.mountpoint)
 
-    for source in source_dir.rglob("*"):
-        if source.name[0] == "." or source.is_dir():
-            # print(f'Skipping {source}')
-            continue
-        rel_path = source.relative_to(source_dir)
-        dest = dest_dir / rel_path
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        if dest.exists():
-            # Round source timestamp to 2s resolution to match FAT drive.
-            source_mtime = (source.stat().st_mtime // 2) * 2
-            dest_mtime = dest.stat().st_mtime
-            if source_mtime == dest_mtime:
-                continue
-        print(f"Copying {rel_path}")
-        shutil.copy2(source, dest)
-
+    for source_dir in args.source_dir:
+        push_tree(source_dir, dest_dir)
     print("Push completed.")
 
 
