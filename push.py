@@ -24,32 +24,35 @@ def run(args):
     return process.stdout
 
 
-def all_devices():
+def is_circuitpy_device(device):
+    # Search for volumes with CIRCUITPY label.
+    for volume in getattr(device, "children", []):
+        if volume.label == "CIRCUITPY":
+            return True
+    return False
+
+
+def circuitpy_devices():
     command = "lsblk --output path,label,mountpoint,serial,model,vendor --json --tree"
 
+    # Translate dictionary entries to attributes for readability.
     def hook(obj):
         return SimpleNamespace(**obj)
 
-    return json.loads(run(command.split()), object_hook=hook).blockdevices
+    devices = json.loads(run(command.split()), object_hook=hook).blockdevices
+    return [d for d in devices if is_circuitpy_device(d)]
 
 
-def circuitpy_device(device_filter):
-    def has_circuitpy_child(d):
-        for c in getattr(d, "children", []):
-            if c.label == "CIRCUITPY":
-                return True
-        return False
-
-    devices = [d for d in all_devices() if has_circuitpy_child(d) and device_filter(d)]
+def unique_circuitpy_device_and_volume(devices):
+    pprint(devices)
     if len(devices) == 0:
         exit("No CircuitPython devices found.")
-        return 1
     if len(devices) > 1:
         pprint(devices)
         exit("Ambiguous choice of CircuitPython device.")
-    parent = devices[0]
-    child = parent.children[0]
-    return parent, child
+    device = devices[0]
+    volume = device.children[0]
+    return device, volume
 
 
 @dataclass
@@ -69,7 +72,9 @@ class Filter:
 
 
 def mount(device_path):
-    mount_stdout = run(f"udisksctl mount --block-device {device_path} --options noatime".split())
+    mount_stdout = run(
+        f"udisksctl mount --block-device {device_path} --options noatime".split()
+    )
     print(f"udisksctl: {mount_stdout}")
 
 
@@ -93,28 +98,40 @@ def push_tree(source_dir, dest_dir):
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument("source_dir", type=Path, nargs='+')
+    parser.add_argument("source_dir", type=Path, nargs="+")
     parser.add_argument("--vendor", type=str, default="")
     parser.add_argument("--model", type=str, default="")
     parser.add_argument("--serial", type=str, default="")
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List all devices matching filter and exit without attemping a push.",
+    )
 
     args = parser.parse_args()
     device_filter = Filter(args.vendor, args.model, args.serial)
-    parent, child = circuitpy_device(device_filter)
+
+    devices = circuitpy_devices()
+
+    if args.list:
+        pprint(devices)
+        exit()
+
+    device, volume = unique_circuitpy_device_and_volume(devices)
 
     print("Selected device:")
-    pprint(parent)
+    pprint(device)
 
-    if child.mountpoint:
-        print(f"Device already mounted at {child.mountpoint}")
+    if volume.mountpoint:
+        print(f"Device already mounted at {volume.mountpoint}")
     else:
-        mount(child.path)
-        parent, child = circuitpy_device(device_filter)
+        mount(volume.path)
+        device, volume = unique_circuitpy_device_and_volume(circuitpy_devices)
 
-    if not child.mountpoint:
+    if not volume.mountpoint:
         exit("CIRCUITPY drive not mounted somehow.")
 
-    dest_dir = Path(child.mountpoint)
+    dest_dir = Path(volume.mountpoint)
 
     for source_dir in args.source_dir:
         push_tree(source_dir, dest_dir)
