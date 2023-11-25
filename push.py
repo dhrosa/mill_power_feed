@@ -24,35 +24,34 @@ def run(args):
     return process.stdout
 
 
-def is_circuitpy_device(device):
-    # Search for volumes with CIRCUITPY label.
-    for volume in getattr(device, "children", []):
-        if volume.label == "CIRCUITPY":
-            return True
-    return False
-
-
-def circuitpy_devices():
+def all_devices():
+    """List all block devices with a CIRCUITPY volume."""
+    # TODO(dhrosa): We should handle the possiblility of multiple volumes.
     command = "lsblk --output path,label,mountpoint,serial,model,vendor --json --tree"
 
     # Translate dictionary entries to attributes for readability.
-    def hook(obj):
-        return SimpleNamespace(**obj)
-
+    hook = lambda obj: SimpleNamespace(**obj)
     devices = json.loads(run(command.split()), object_hook=hook).blockdevices
+
+    def is_circuitpy_device(device):
+        # Search for volumes with CIRCUITPY label.
+        for volume in getattr(device, "children", []):
+            if volume.label == "CIRCUITPY":
+                return True
+        return False
+
     return [d for d in devices if is_circuitpy_device(d)]
 
 
-def unique_circuitpy_device_and_volume(devices):
-    pprint(devices)
+def unique_device_and_volume(devices):
+    """Returns the single device and CIRCUITPY volume. If there isn't strictly one device, we exit the process with an error."""
     if len(devices) == 0:
         exit("No CircuitPython devices found.")
     if len(devices) > 1:
         pprint(devices)
         exit("Ambiguous choice of CircuitPython device.")
     device = devices[0]
-    volume = device.children[0]
-    return device, volume
+    return device, device.children[0]
 
 
 @dataclass
@@ -110,14 +109,12 @@ def main():
 
     args = parser.parse_args()
     device_filter = Filter(args.vendor, args.model, args.serial)
-
-    devices = circuitpy_devices()
-
+    devices = all_devices()
     if args.list:
         pprint(devices)
         exit()
 
-    device, volume = unique_circuitpy_device_and_volume(devices)
+    device, volume = unique_device_and_volume(devices)
 
     print("Selected device:")
     pprint(device)
@@ -126,11 +123,10 @@ def main():
         print(f"Device already mounted at {volume.mountpoint}")
     else:
         mount(volume.path)
-        device, volume = unique_circuitpy_device_and_volume(circuitpy_devices)
+        device, volume = unique_device_and_volume(all_devices())
 
     if not volume.mountpoint:
         exit("CIRCUITPY drive not mounted somehow.")
-
     dest_dir = Path(volume.mountpoint)
 
     for source_dir in args.source_dir:
