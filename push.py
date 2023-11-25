@@ -24,8 +24,10 @@ def run(args):
     return process.stdout
 
 
-def all_devices():
-    """List all block devices with a CIRCUITPY volume."""
+def all_devices(device_filter):
+    """
+    List all block devices with a CIRCUITPY volume that match the provided predicate.
+    """
     # TODO(dhrosa): We should handle the possiblility of multiple volumes.
     command = "lsblk --output path,label,mountpoint,serial,model,vendor --json --tree"
 
@@ -40,11 +42,13 @@ def all_devices():
                 return True
         return False
 
-    return [d for d in devices if is_circuitpy_device(d)]
+    return [d for d in devices if is_circuitpy_device(d) and device_filter(d)]
 
 
 def unique_device_and_volume(devices):
-    """Returns the single device and CIRCUITPY volume. If there isn't strictly one device, we exit the process with an error."""
+    """
+    Returns the single device and CIRCUITPY volume. If there isn't strictly one device, we exit the process with an error.
+    """
     if len(devices) == 0:
         exit("No CircuitPython devices found.")
     if len(devices) > 1:
@@ -52,22 +56,6 @@ def unique_device_and_volume(devices):
         exit("Ambiguous choice of CircuitPython device.")
     device = devices[0]
     return device, device.children[0]
-
-
-@dataclass
-class Filter:
-    vendor: str
-    model: str
-    serial: str
-
-    def __call__(self, device):
-        return all(
-            (
-                self.vendor in device.vendor,
-                self.model in device.model,
-                self.serial in device.serial,
-            )
-        )
 
 
 def mount(device_path):
@@ -97,7 +85,7 @@ def push_tree(source_dir, dest_dir):
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument("source_dir", type=Path, nargs="+")
+    parser.add_argument("source_dir", type=Path, nargs="*")
     parser.add_argument("--vendor", type=str, default="")
     parser.add_argument("--model", type=str, default="")
     parser.add_argument("--serial", type=str, default="")
@@ -108,11 +96,26 @@ def main():
     )
 
     args = parser.parse_args()
-    device_filter = Filter(args.vendor, args.model, args.serial)
-    devices = all_devices()
+
+    def device_filter(device):
+        """Predicate for devices matching requested filter."""
+        return all(
+            (
+                args.vendor in device.vendor,
+                args.model in device.model,
+                args.serial in device.serial,
+            )
+        )
+
+    devices = all_devices(device_filter)
     if args.list:
+        print("Matching devices:")
         pprint(devices)
         exit()
+
+    if not args.source_dir:
+        parser.print_usage()
+        exit("At least one source directory required if --list is not specified.")
 
     device, volume = unique_device_and_volume(devices)
 
@@ -123,7 +126,7 @@ def main():
         print(f"Device already mounted at {volume.mountpoint}")
     else:
         mount(volume.path)
-        device, volume = unique_device_and_volume(all_devices())
+        device, volume = unique_device_and_volume(all_devices(device_filter))
 
     if not volume.mountpoint:
         exit("CIRCUITPY drive not mounted somehow.")
