@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 import subprocess
 import json
 from pathlib import Path
@@ -116,6 +118,12 @@ def main():
     if not args.source_dir:
         parser.print_usage()
         exit("At least one source directory required if --list is not specified.")
+
+    for source_dir in args.source_dir:
+        if not source_dir.exists():
+            exit(f"Path '{source_dir}' does not exist.")
+        if not source_dir.is_dir():
+            exit(f"Path '{source_dir}' is not a directory.")
 
     device, volume = unique_device_and_volume(devices)
 
