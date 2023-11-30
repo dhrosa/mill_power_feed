@@ -173,8 +173,11 @@ def main():
     pprint(device)
 
     if args.command == "serial":
-        print(device.serial_path)
-        exit()
+        import os
+
+        os.execlp("minicom", "minicom", "-D", device.serial_path)
+
+    assert args.command == "push"
 
     for source_dir in args.source_dir:
         if not source_dir.exists():
