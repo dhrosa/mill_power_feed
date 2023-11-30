@@ -145,9 +145,10 @@ def main():
 
     subparsers = parser.add_subparsers(required=True, dest="command")
 
-    list_parser = subparsers.add_parser("list")
+    subparsers.add_parser("list")
     push_parser = subparsers.add_parser("push")
     push_parser.add_argument("source_dir", type=Path, nargs="+")
+    subparsers.add_parser("serial")
 
     args = parser.parse_args()
 
@@ -167,16 +168,19 @@ def main():
         pprint(devices)
         exit()
 
+    device = unique_device(devices)
+    print("Selected device:")
+    pprint(device)
+
+    if args.command == "serial":
+        print(device.serial_path)
+        exit()
+
     for source_dir in args.source_dir:
         if not source_dir.exists():
             exit(f"Path '{source_dir}' does not exist.")
         if not source_dir.is_dir():
             exit(f"Path '{source_dir}' is not a directory.")
-
-    device = unique_device(devices)
-
-    print("Selected device:")
-    pprint(device)
 
     dest_dir = Path(mount_if_needed(device.partition_path))
 
