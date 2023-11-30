@@ -87,15 +87,15 @@ def push_tree(source_dir, dest_dir):
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument("source_dir", type=Path, nargs="*")
     parser.add_argument("--vendor", type=str, default="")
     parser.add_argument("--model", type=str, default="")
     parser.add_argument("--serial", type=str, default="")
-    parser.add_argument(
-        "--list",
-        action="store_true",
-        help="List all devices matching filter and exit without attemping a push.",
-    )
+
+    subparsers = parser.add_subparsers(required=True, dest="command")
+
+    list_parser = subparsers.add_parser("list")
+    push_parser = subparsers.add_parser("push")
+    push_parser.add_argument("source_dir", type=Path, nargs="+")
 
     args = parser.parse_args()
 
@@ -110,14 +110,10 @@ def main():
         )
 
     devices = all_devices(device_filter)
-    if args.list:
+    if args.command == "list":
         print("Matching devices:")
         pprint(devices)
         exit()
-
-    if not args.source_dir:
-        parser.print_usage()
-        exit("At least one source directory required if --list is not specified.")
 
     for source_dir in args.source_dir:
         if not source_dir.exists():
