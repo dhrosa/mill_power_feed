@@ -9,7 +9,7 @@ from sys import exit
 from types import SimpleNamespace
 from pprint import pprint
 from argparse import ArgumentParser
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 
 def run(args):
@@ -26,45 +26,97 @@ def run(args):
     return process.stdout
 
 
-def all_devices(device_filter):
+@dataclass
+class Device:
+    vendor: str
+    model: str
+    serial: str
+
+    partition_path: str = None
+    serial_path: str = None
+
+
+def get_device_info(path):
+    info = {}
+    args = f"udevadm info --query=property --name {path}".split()
+    for line in run(args).splitlines():
+        key, value = line.split("=", maxsplit=1)
+        info[key] = value
+    if info.get("ID_BUS", None) != "usb":
+        return None
+    return info
+
+
+def all_devices():
+    devices = []
+
+    def find_or_add_device(info):
+        vendor = info["ID_USB_VENDOR"]
+        model = info["ID_USB_MODEL"]
+        serial = info["ID_USB_SERIAL_SHORT"]
+
+        for device in devices:
+            if (
+                device.vendor == vendor
+                and device.model == model
+                and device.serial == serial
+            ):
+                return device
+        device = Device(vendor, model, serial)
+        devices.append(device)
+        return device
+
+    for path in Path("/dev/disk/by-id/").iterdir():
+        info = get_device_info(path)
+        if (
+            info is None
+            or info["DEVTYPE"] != "partition"
+            or info["ID_FS_LABEL"] != "CIRCUITPY"
+        ):
+            continue
+        device = find_or_add_device(info)
+        device.partition_path = str(path)
+
+    for path in Path("/dev/serial/by-id/").iterdir():
+        info = get_device_info(path)
+        if info is None:
+            continue
+        device = find_or_add_device(info)
+        device.serial_path = str(path)
+
+    return devices
+
+
+def get_mountpoint(partition_path):
+    args = f"lsblk {partition_path} --output mountpoint --noheadings".split()
+    return run(args).strip()
+
+
+def mount_if_needed(partition_path):
+    mountpoint = get_mountpoint(partition_path)
+    if mountpoint:
+        print(f"Device already mounted at {mountpoint}.")
+        return mountpoint
+    mount_stdout = run(
+        f"udisksctl mount --block-device {partition_path} --options noatime".split()
+    )
+    print(f"udisksctl: {mount_stdout}")
+    mountpoint = get_mountpoint(partition_path)
+    if mountpoint:
+        return mountpoint
+    exit(f"{partition_path} somehow not mounted.")
+
+
+def unique_device(devices):
     """
-    List all block devices with a CIRCUITPY volume that match the provided predicate.
-    """
-    # TODO(dhrosa): We should handle the possiblility of multiple volumes.
-    command = "lsblk --output path,label,mountpoint,serial,model,vendor --json --tree"
-
-    # Translate dictionary entries to attributes for readability.
-    hook = lambda obj: SimpleNamespace(**obj)
-    devices = json.loads(run(command.split()), object_hook=hook).blockdevices
-
-    def is_circuitpy_device(device):
-        # Search for volumes with CIRCUITPY label.
-        for volume in getattr(device, "children", []):
-            if volume.label == "CIRCUITPY":
-                return True
-        return False
-
-    return [d for d in devices if is_circuitpy_device(d) and device_filter(d)]
-
-
-def unique_device_and_volume(devices):
-    """
-    Returns the single device and CIRCUITPY volume. If there isn't strictly one device, we exit the process with an error.
+    Returns the single device in the list. If there isn't strictly one device, we exit the process with an error.
     """
     if len(devices) == 0:
         exit("No CircuitPython devices found.")
     if len(devices) > 1:
         pprint(devices)
         exit("Ambiguous choice of CircuitPython device.")
-    device = devices[0]
-    return device, device.children[0]
-
-
-def mount(device_path):
-    mount_stdout = run(
-        f"udisksctl mount --block-device {device_path} --options noatime".split()
-    )
-    print(f"udisksctl: {mount_stdout}")
+    return devices[0]
 
 
 def push_tree(source_dir, dest_dir):
@@ -109,7 +161,7 @@ def main():
             )
         )
 
-    devices = all_devices(device_filter)
+    devices = [d for d in all_devices() if device_filter(d)]
     if args.command == "list":
         print("Matching devices:")
         pprint(devices)
@@ -121,24 +173,16 @@ def main():
         if not source_dir.is_dir():
             exit(f"Path '{source_dir}' is not a directory.")
 
-    device, volume = unique_device_and_volume(devices)
+    device = unique_device(devices)
 
     print("Selected device:")
     pprint(device)
 
-    if volume.mountpoint:
-        print(f"Device already mounted at {volume.mountpoint}")
-    else:
-        mount(volume.path)
-        device, volume = unique_device_and_volume(all_devices(device_filter))
-
-    if not volume.mountpoint:
-        exit("CIRCUITPY drive not mounted somehow.")
-    dest_dir = Path(volume.mountpoint)
+    dest_dir = Path(mount_if_needed(device.partition_path))
 
     for source_dir in args.source_dir:
         push_tree(source_dir, dest_dir)
-    print("Push completed.")
+    print("Push complete.")
 
 
 if __name__ == "__main__":
