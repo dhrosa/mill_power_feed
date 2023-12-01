@@ -161,25 +161,66 @@ def list_command(devices):
     pprint(devices)
 
 
-def upload_command(device, source_dirs):
+def upload_command(device, source_dirs, watch):
     """upload subcommand."""
     print("Uploading to device: ")
     pprint(device)
-    for source_dir in source_dirs:
-        if not source_dir.exists():
-            exit(f"Path '{source_dir}' does not exist.")
-        if not source_dir.is_dir():
-            exit(f"Path '{source_dir}' is not a directory.")
-
     dest_dir = Path(mount_if_needed(device.partition_path))
 
-    for source_dir in source_dirs:
-        copy_tree(source_dir, dest_dir)
-    print("Upload complete.")
+    def single_upload():
+        for source_dir in source_dirs:
+            if not source_dir.exists():
+                exit(f"Path '{source_dir}' does not exist.")
+            if not source_dir.is_dir():
+                exit(f"Path '{source_dir}' is not a directory.")
+
+        for source_dir in source_dirs:
+            copy_tree(source_dir, dest_dir)
+        print("Upload complete.")
+
+    single_upload()
+    if not watch:
+        return
+
+    from inotify_simple import INotify, flags
+
+    watcher = INotify()
+
+    def watched_dirs():
+        """Generator that recursively yields all source directories and subdirectories."""
+        for source_dir in source_dirs:
+            yield source_dir
+            for parent, subdirs, files in source_dir.walk():
+                for subdir in subdirs:
+                    yield parent / subdir
+
+    # Maps inotify descriptors to source directories.
+    descriptor_to_path = {}
+    for source_dir in watched_dirs():
+        print(f"Watching source directory {source_dir} for changes.")
+        descriptor = watcher.add_watch(
+            source_dir,
+            flags.CREATE
+            | flags.MODIFY
+            | flags.ATTRIB
+            | flags.DELETE
+            | flags.DELETE_SELF,
+        )
+        descriptor_to_path[descriptor] = source_dir
+
+    while True:
+        need_upload = False
+        for event in watcher.read(read_delay=100):
+            source_dir = descriptor_to_path[event.wd]
+            path = source_dir / event.name
+            print(f"{path} modified.")
+            need_upload = True
+        if need_upload:
+            single_upload()
 
 
-def serial_command(device):
-    """serial subcommand."""
+def connect_command(device):
+    """connect subcommand."""
     print("Launching minicom for ")
     pprint(device)
     execlp("minicom", "minicom", "-D", device.serial_path)
@@ -187,36 +228,65 @@ def serial_command(device):
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument(
+
+    # Common flags between subcommands.
+    filter_group = parser.add_mutually_exclusive_group()
+    filter_group.add_argument(
         "--vendor",
         type=str,
         default="",
         help="Filter to devices whose vendor contains this string.",
     )
-    parser.add_argument(
+    filter_group.add_argument(
         "--model",
         type=str,
         default="",
         help="Filter to devices whose model contains this string.",
     )
-    parser.add_argument(
+    filter_group.add_argument(
         "--serial",
         type=str,
         default="",
         help="Filter to devices whose serial contains this string.",
     )
+    filter_group.add_argument(
+        "--fuzzy",
+        type=str,
+        default="",
+        help="Filter to devices whose vendor, model, or serial contains this string.",
+    )
 
+    # Subcommand parsers.
     subparsers = parser.add_subparsers(required=True, dest="command")
 
-    subparsers.add_parser("list")
-    upload_parser = subparsers.add_parser("upload")
-    upload_parser.add_argument("source_dir", type=Path, nargs="+")
-    subparsers.add_parser("serial")
+    subparsers.add_parser(
+        "list", help="List all CircuitPython devices matching the requested filters."
+    )
+
+    upload_parser = subparsers.add_parser("upload", help="Upload code to device.")
+    upload_parser.add_argument(
+        "source_dir", type=Path, nargs="+", help="Source directory to copy."
+    )
+    upload_parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="Continuously upload code as files in the source directories change.",
+    )
+
+    subparsers.add_parser("connect", help="Connect to device's serial console.")
 
     args = parser.parse_args()
 
     def device_filter(device):
         """Predicate for devices matching requested filter."""
+        if args.fuzzy:
+            return any(
+                (
+                    args.fuzzy in device.vendor,
+                    args.fuzzy in device.model,
+                    args.fuzzy in device.serial,
+                )
+            )
         return all(
             (
                 args.vendor in device.vendor,
@@ -231,9 +301,9 @@ def main():
         case "list":
             list_command(devices)
         case "upload":
-            upload_command(unique_device(devices), args.source_dir)
-        case "serial":
-            serial_command(unique_device(devices))
+            upload_command(unique_device(devices), args.source_dir, args.watch)
+        case "connect":
+            connect_command(unique_device(devices))
 
 
 if __name__ == "__main__":
